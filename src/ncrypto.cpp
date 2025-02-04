@@ -499,7 +499,9 @@ int64_t PortableTimeGM(struct tm* t) {
 // ============================================================================
 // SPKAC
 
-bool VerifySpkac(const char* input, size_t length) {
+namespace {
+bool VerifySpkacImpl(const char* input, size_t length) {
+  ClearErrorOnReturn clearErrorOnReturn;
 #ifdef OPENSSL_IS_BORINGSSL
   // OpenSSL uses EVP_DecodeBlock, which explicitly removes trailing characters,
   // while BoringSSL uses EVP_DecodedLength and EVP_DecodeBase64, which do not.
@@ -517,9 +519,11 @@ bool VerifySpkac(const char* input, size_t length) {
   return pkey ? NETSCAPE_SPKI_verify(spki.get(), pkey.get()) > 0 : false;
 }
 
-BIOPointer ExportPublicKey(const char* input, size_t length) {
-  BIOPointer bio(BIO_new(BIO_s_mem()));
-  if (!bio) return {};
+BIOPointer ExportPublicKeyImpl(const char* input, size_t length) {
+  ClearErrorOnReturn clearErrorOnReturn;
+  auto bio = BIOPointer::NewMem();
+  if (!bio) [[unlikely]]
+    return {};
 
 #ifdef OPENSSL_IS_BORINGSSL
   // OpenSSL uses EVP_DecodeBlock, which explicitly removes trailing characters,
@@ -528,17 +532,21 @@ BIOPointer ExportPublicKey(const char* input, size_t length) {
   length = std::string_view(input, length).find_last_not_of(" \n\r\t") + 1;
 #endif
   NetscapeSPKIPointer spki(NETSCAPE_SPKI_b64_decode(input, length));
-  if (!spki) return {};
+  if (!spki) [[unlikely]] {
+    return {};
+  }
 
   EVPKeyPointer pkey(NETSCAPE_SPKI_get_pubkey(spki.get()));
-  if (!pkey) return {};
 
-  if (PEM_write_bio_PUBKEY(bio.get(), pkey.get()) <= 0) return {};
+  if (!pkey || PEM_write_bio_PUBKEY(bio.get(), pkey.get()) <= 0) [[unlikely]] {
+    return {};
+  }
 
   return bio;
 }
 
-Buffer<char> ExportChallenge(const char* input, size_t length) {
+DataPointer ExportChallengeImpl(const char* input, size_t length) {
+  ClearErrorOnReturn clearErrorOnReturn;
 #ifdef OPENSSL_IS_BORINGSSL
   // OpenSSL uses EVP_DecodeBlock, which explicitly removes trailing characters,
   // while BoringSSL uses EVP_DecodedLength and EVP_DecodeBase64, which do not.
@@ -551,12 +559,44 @@ Buffer<char> ExportChallenge(const char* input, size_t length) {
   unsigned char* buf = nullptr;
   int buf_size = ASN1_STRING_to_UTF8(&buf, sp->spkac->challenge);
   if (buf_size >= 0) {
-    return {
+    return DataPointer({
         .data = reinterpret_cast<char*>(buf),
         .len = static_cast<size_t>(buf_size),
-    };
+    });
   }
 
+  return {};
+}
+}  // namespace
+
+bool VerifySpkac(const Buffer<const char>& input) {
+  return VerifySpkacImpl(input.data, input.len);
+}
+
+BIOPointer ExportPublicKey(const Buffer<const char>& input) {
+  return ExportPublicKeyImpl(input.data, input.len);
+}
+
+DataPointer ExportChallenge(const Buffer<const char>& input) {
+  return ExportChallengeImpl(input.data, input.len);
+}
+
+bool VerifySpkac(const char* input, size_t length) {
+  return VerifySpkacImpl(input, length);
+}
+
+BIOPointer ExportPublicKey(const char* input, size_t length) {
+  return ExportPublicKeyImpl(input, length);
+}
+
+Buffer<char> ExportChallenge(const char* input, size_t length) {
+  if (auto dp = ExportChallengeImpl(input, length)) {
+    auto released = dp.release();
+    return Buffer<char>{
+        .data = static_cast<char*>(released.data),
+        .len = released.len,
+    };
+  }
   return {};
 }
 

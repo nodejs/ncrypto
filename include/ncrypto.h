@@ -1361,11 +1361,19 @@ bool SafeX509InfoAccessPrint(const BIOPointer& out, X509_EXTENSION* ext);
 // ============================================================================
 // SPKAC
 
+[[deprecated("Use the version that takes a Buffer")]]
 bool VerifySpkac(const char* input, size_t length);
+
+[[deprecated("Use the version that takes a Buffer")]]
 BIOPointer ExportPublicKey(const char* input, size_t length);
 
 // The caller takes ownership of the returned Buffer<char>
+[[deprecated("Use the version that takes a Buffer")]]
 Buffer<char> ExportChallenge(const char* input, size_t length);
+
+bool VerifySpkac(const Buffer<const char>& buf);
+BIOPointer ExportPublicKey(const Buffer<const char>& buf);
+DataPointer ExportChallenge(const Buffer<const char>& buf);
 
 // ============================================================================
 // KDF
