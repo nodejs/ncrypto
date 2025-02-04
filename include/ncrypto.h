@@ -1392,9 +1392,18 @@ DataPointer hkdf(const EVP_MD* md, const Buffer<const unsigned char>& key,
 
 bool checkScryptParams(uint64_t N, uint64_t r, uint64_t p, uint64_t maxmem);
 
+bool scryptInto(const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt, uint64_t N, uint64_t r,
+                uint64_t p, uint64_t maxmem, size_t length,
+                Buffer<unsigned char>* out);
+
 DataPointer scrypt(const Buffer<const char>& pass,
                    const Buffer<const unsigned char>& salt, uint64_t N,
                    uint64_t r, uint64_t p, uint64_t maxmem, size_t length);
+
+bool pbkdf2Into(const EVP_MD* md, const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt, uint32_t iterations,
+                size_t length, Buffer<unsigned char>* out);
 
 DataPointer pbkdf2(const EVP_MD* md, const Buffer<const char>& pass,
                    const Buffer<const unsigned char>& salt, uint32_t iterations,

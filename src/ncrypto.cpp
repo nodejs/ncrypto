@@ -1674,39 +1674,63 @@ bool checkScryptParams(uint64_t N, uint64_t r, uint64_t p, uint64_t maxmem) {
          1;
 }
 
+bool scryptInto(const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt, uint64_t N, uint64_t r,
+                uint64_t p, uint64_t maxmem, size_t length,
+                Buffer<unsigned char>* out) {
+  ClearErrorOnReturn clearErrorOnReturn;
+
+  if (pass.len > INT_MAX || salt.len > INT_MAX || out == nullptr) {
+    return false;
+  }
+
+  if (auto dp = DataPointer::Alloc(length)) {
+    return EVP_PBE_scrypt(pass.data, pass.len, salt.data, salt.len, N, r, p,
+                          maxmem, out->data, length);
+  }
+
+  return false;
+}
+
 DataPointer scrypt(const Buffer<const char>& pass,
                    const Buffer<const unsigned char>& salt, uint64_t N,
                    uint64_t r, uint64_t p, uint64_t maxmem, size_t length) {
-  ClearErrorOnReturn clearErrorOnReturn;
-
-  if (pass.len > INT_MAX || salt.len > INT_MAX) {
-    return {};
-  }
-
-  auto dp = DataPointer::Alloc(length);
-  if (dp &&
-      EVP_PBE_scrypt(pass.data, pass.len, salt.data, salt.len, N, r, p, maxmem,
-                     reinterpret_cast<unsigned char*>(dp.get()), length)) {
-    return dp;
+  if (auto dp = DataPointer::Alloc(length)) {
+    Buffer<unsigned char> buf = dp;
+    if (scryptInto(pass, salt, N, r, p, maxmem, length, &buf)) {
+      return dp;
+    }
   }
 
   return {};
 }
 
+bool pbkdf2Into(const EVP_MD* md, const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt, uint32_t iterations,
+                size_t length, Buffer<unsigned char>* out) {
+  ClearErrorOnReturn clearErrorOnReturn;
+
+  if (pass.len > INT_MAX || salt.len > INT_MAX || length > INT_MAX ||
+      out == nullptr) {
+    return false;
+  }
+
+  if (PKCS5_PBKDF2_HMAC(pass.data, pass.len, salt.data, salt.len, iterations,
+                        md, length, out->data)) {
+    return true;
+  }
+
+  return false;
+}
+
 DataPointer pbkdf2(const EVP_MD* md, const Buffer<const char>& pass,
                    const Buffer<const unsigned char>& salt, uint32_t iterations,
                    size_t length) {
-  ClearErrorOnReturn clearErrorOnReturn;
-
-  if (pass.len > INT_MAX || salt.len > INT_MAX || length > INT_MAX) {
-    return {};
-  }
-
-  auto dp = DataPointer::Alloc(length);
-  if (dp && PKCS5_PBKDF2_HMAC(pass.data, pass.len, salt.data, salt.len,
-                              iterations, md, length,
-                              reinterpret_cast<unsigned char*>(dp.get()))) {
-    return dp;
+  if (auto dp = DataPointer::Alloc(length)) {
+    Buffer<unsigned char> buf = dp;
+    if (pbkdf2Into(md, pass, salt, iterations, length, &buf)) {
+      return dp;
+    }
   }
 
   return {};
