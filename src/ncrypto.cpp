@@ -242,8 +242,13 @@ void BignumPointer::reset(const unsigned char* data, size_t len) {
 BIGNUM* BignumPointer::release() { return bn_.release(); }
 
 size_t BignumPointer::byteLength() const {
-  if (bn_ == nullptr) return 0;
+  if (!bn_) return 0;
   return BN_num_bytes(bn_.get());
+}
+
+size_t BignumPointer::bitLength() const {
+  if (!bn_) return 0;
+  return BN_num_bits(bn_.get());
 }
 
 DataPointer BignumPointer::encode() const {

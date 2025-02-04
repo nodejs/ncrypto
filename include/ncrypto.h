@@ -526,6 +526,7 @@ class BignumPointer final {
   unsigned long getWord() const;  // NOLINT(runtime/int)
 
   size_t byteLength() const;
+  size_t bitLength() const;
 
   DataPointer toHex() const;
   DataPointer encode() const;
