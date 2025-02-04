@@ -1381,6 +1381,11 @@ bool checkHkdfLength(const EVP_MD* md, size_t length);
 bool extractP1363(const Buffer<const unsigned char>& buf, unsigned char* dest,
                   size_t n);
 
+bool hkdfInfo(const EVP_MD* md, const Buffer<const unsigned char>& key,
+              const Buffer<const unsigned char>& info,
+              const Buffer<const unsigned char>& salt, size_t length,
+              Buffer<unsigned char>* out);
+
 DataPointer hkdf(const EVP_MD* md, const Buffer<const unsigned char>& key,
                  const Buffer<const unsigned char>& info,
                  const Buffer<const unsigned char>& salt, size_t length);

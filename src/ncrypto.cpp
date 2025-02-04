@@ -1608,21 +1608,22 @@ bool checkHkdfLength(const EVP_MD* md, size_t length) {
   return true;
 }
 
-DataPointer hkdf(const EVP_MD* md, const Buffer<const unsigned char>& key,
-                 const Buffer<const unsigned char>& info,
-                 const Buffer<const unsigned char>& salt, size_t length) {
+bool hkdfInfo(const EVP_MD* md, const Buffer<const unsigned char>& key,
+              const Buffer<const unsigned char>& info,
+              const Buffer<const unsigned char>& salt, size_t length,
+              Buffer<unsigned char>* out) {
   ClearErrorOnReturn clearErrorOnReturn;
 
   if (!checkHkdfLength(md, length) || info.len > INT_MAX ||
       salt.len > INT_MAX) {
-    return {};
+    return false;
   }
 
   auto ctx = EVPKeyCtxPointer::NewFromID(EVP_PKEY_HKDF);
   if (!ctx || !EVP_PKEY_derive_init(ctx.get()) ||
       !EVP_PKEY_CTX_set_hkdf_md(ctx.get(), md) ||
       !EVP_PKEY_CTX_add1_hkdf_info(ctx.get(), info.data, info.len)) {
-    return {};
+    return false;
   }
 
   std::string_view actual_salt;
@@ -1637,30 +1638,35 @@ DataPointer hkdf(const EVP_MD* md, const Buffer<const unsigned char>& key,
   // implement the extraction step ourselves because EVP_PKEY_derive does not
   // handle zero-length keys, which are required for Web Crypto.
   // TODO(jasnell): Once OpenSSL 1.1.1 support is dropped completely, and once
-  // BoringSSL is confirmed to support it, wen can hopefully drop this and use
+  // BoringSSL is confirmed to support it, we can hopefully drop this and use
   // EVP_KDF directly which does support zero length keys.
   unsigned char pseudorandom_key[EVP_MAX_MD_SIZE];
   unsigned pseudorandom_key_len = sizeof(pseudorandom_key);
 
   if (HMAC(md, actual_salt.data(), actual_salt.size(), key.data, key.len,
            pseudorandom_key, &pseudorandom_key_len) == nullptr) {
-    return {};
+    return false;
   }
   if (!EVP_PKEY_CTX_hkdf_mode(ctx.get(), EVP_PKEY_HKDEF_MODE_EXPAND_ONLY) ||
       !EVP_PKEY_CTX_set1_hkdf_key(ctx.get(), pseudorandom_key,
                                   pseudorandom_key_len)) {
-    return {};
+    return false;
   }
 
+  if (out == nullptr || out->len != length) return false;
+
+  return EVP_PKEY_derive(ctx.get(), out->data, &length) > 0;
+}
+
+DataPointer hkdf(const EVP_MD* md, const Buffer<const unsigned char>& key,
+                 const Buffer<const unsigned char>& info,
+                 const Buffer<const unsigned char>& salt, size_t length) {
   auto buf = DataPointer::Alloc(length);
   if (!buf) return {};
+  Buffer<unsigned char> out = buf;
 
-  if (EVP_PKEY_derive(ctx.get(), static_cast<unsigned char*>(buf.get()),
-                      &length) <= 0) {
-    return {};
-  }
-
-  return buf;
+  return hkdfInfo(md, key, info, salt, length, &out) ? std::move(buf)
+                                                     : DataPointer();
 }
 
 bool checkScryptParams(uint64_t N, uint64_t r, uint64_t p, uint64_t maxmem) {
