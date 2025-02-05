@@ -1,29 +1,43 @@
 cmake_minimum_required(VERSION 3.28)
 project(ncrypto)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+include(CTest)
+include(GNUInstallDirs)
+include(FetchContent)
+include(cmake/ncrypto-flags.cmake)
+
 if (NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 endif()
 
-option(NCRYPTO_DEVELOPMENT_CHECKS "Enable development checks" OFF)
+include(cmake/CPM.cmake)
 
-include(GNUInstallDirs)
-include(FetchContent)
-
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+CPMAddPackage(
+    NAME boringssl
+    VERSION 0.20250114.0
+    GITHUB_REPOSITORY google/boringssl
+    GIT_TAG 0.20250114.0
+    OPTIONS "BUILD_SHARED_LIBS OFF"
 )
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+message(STATUS "BoringSSL source dir: ${boringssl_SOURCE_DIR}")
+include_directories(${boringssl_SOURCE_DIR}/include)
+
+if (NCRYPTO_TESTING)
+  CPMAddPackage(
+      NAME GTest
+      GITHUB_REPOSITORY google/googletest
+      VERSION 1.15.2
+      OPTIONS  "BUILD_GMOCK OFF" "INSTALL_GTEST OFF"
+  )
+  # For Windows: Prevent overriding the parent project's compiler/linker settings
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 add_subdirectory(src)
-enable_testing()
-add_subdirectory(tests)
+add_library(ncrypto::ncrypto ALIAS ncrypto)
 
 install(
   FILES include/ncrypto.h
