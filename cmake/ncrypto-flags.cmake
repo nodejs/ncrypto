@@ -1,5 +1,5 @@
 option(NCRYPTO_DEVELOPMENT_CHECKS "development checks (useful for debugging)" OFF)
-option(NCRYPTO_TESTING "Build tests" OFF)
+option(NCRYPTO_TESTING "Build tests" ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
