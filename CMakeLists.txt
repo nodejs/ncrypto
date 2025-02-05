@@ -18,7 +18,7 @@ CPMAddPackage(
     VERSION 0.20250114.0
     GITHUB_REPOSITORY google/boringssl
     GIT_TAG 0.20250114.0
-    OPTIONS "BUILD_SHARED_LIBS OFF"
+    OPTIONS "BUILD_SHARED_LIBS OFF" "BUILD_TESTING OFF"
 )
 message(STATUS "BoringSSL source dir: ${boringssl_SOURCE_DIR}")
 include_directories(${boringssl_SOURCE_DIR}/include)
