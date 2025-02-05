@@ -1,5 +1,5 @@
-add_library(ncrypto ncrypto.cpp)
-target_link_libraries(ncrypto :RKVATE boringssl)
+add_library(ncrypto ncrypto.cpp engine.cpp)
+target_link_libraries(ncrypto boringssl)
 
 target_include_directories(ncrypto
     PUBLIC
