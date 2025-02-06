@@ -20,7 +20,9 @@ CPMAddPackage(
     GIT_TAG 0.20250114.0
     OPTIONS "BUILD_SHARED_LIBS OFF" "BUILD_TESTING OFF"
 )
-message(STATUS "BoringSSL source dir: ${boringssl_SOURCE_DIR}")
+add_subdirectory(src)
+add_library(ncrypto::ncrypto ALIAS ncrypto)
+
 include_directories(${boringssl_SOURCE_DIR}/include)
 
 if (NCRYPTO_TESTING)
@@ -35,9 +37,6 @@ if (NCRYPTO_TESTING)
   enable_testing()
   add_subdirectory(tests)
 endif()
-
-add_subdirectory(src)
-add_library(ncrypto::ncrypto ALIAS ncrypto)
 
 install(
   FILES include/ncrypto.h
