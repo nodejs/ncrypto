@@ -793,6 +793,7 @@ class EVPKeyPointer final {
   int getDefaultSignPadding() const;
   operator Rsa() const;
   operator Dsa() const;
+  operator Ec() const;
 
   bool isRsaVariant() const;
   bool isOneShotVariant() const;

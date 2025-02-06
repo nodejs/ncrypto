@@ -2124,6 +2124,7 @@ EVPKeyPointer::ParseKeyResult EVPKeyPointer::TryParsePrivateKey(
           ERR_GET_REASON(err) == PEM_R_BAD_PASSWORD_READ && !had_passphrase) {
         return ParseKeyResult(PKParseError::NEED_PASSPHRASE);
       }
+
       return ParseKeyResult(PKParseError::FAILED, err);
     }
     if (!pkey) return ParseKeyResult(PKParseError::FAILED);
@@ -2195,11 +2196,8 @@ Result<BIOPointer, bool> EVPKeyPointer::writePrivateKey(
       // PKCS1 is only permitted for RSA keys.
       if (id() != EVP_PKEY_RSA) return Result<BIOPointer, bool>(false);
 
-#if OPENSSL_VERSION_MAJOR >= 3
-      const RSA* rsa = EVP_PKEY_get0_RSA(get());
-#else
-      RSA* rsa = EVP_PKEY_get0_RSA(get());
-#endif
+      OSSL3_CONST RSA* rsa = EVP_PKEY_get0_RSA(get());
+
       switch (config.format) {
         case PKFormatType::PEM: {
           err = PEM_write_bio_RSAPrivateKey(
@@ -2246,11 +2244,8 @@ Result<BIOPointer, bool> EVPKeyPointer::writePrivateKey(
       // SEC1 is only permitted for EC keys
       if (id() != EVP_PKEY_EC) return Result<BIOPointer, bool>(false);
 
-#if OPENSSL_VERSION_MAJOR >= 3
-      const EC_KEY* ec = EVP_PKEY_get0_EC_KEY(get());
-#else
-      EC_KEY* ec = EVP_PKEY_get0_EC_KEY(get());
-#endif
+      OSSL3_CONST EC_KEY* ec = EVP_PKEY_get0_EC_KEY(get());
+
       switch (config.format) {
         case PKFormatType::PEM: {
           err = PEM_write_bio_ECPrivateKey(
@@ -2397,6 +2392,15 @@ EVPKeyPointer::operator Dsa() const {
   OSSL3_CONST DSA* dsa = EVP_PKEY_get0_DSA(get());
   if (dsa == nullptr) return {};
   return Dsa(dsa);
+}
+
+EVPKeyPointer::operator Ec() const {
+  int type = id();
+  if (type != EVP_PKEY_EC) return {};
+
+  OSSL3_CONST EC_KEY* ec = EVP_PKEY_get0_EC_KEY(get());
+  if (ec == nullptr) return {};
+  return Ec(ec);
 }
 
 bool EVPKeyPointer::validateDsaParameters() const {
