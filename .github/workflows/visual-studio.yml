@@ -31,6 +31,10 @@ jobs:
           - {gen: Visual Studio 17 2022, arch: x64, config: Debug}
     steps:
     - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+    - name: Install Dependencies
+      run: |
+        choco install nasm
+        echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: Configure
       run: |
         cmake -G "${{matrix.gen}}" -A ${{matrix.arch}}  -B build
