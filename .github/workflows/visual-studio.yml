@@ -31,6 +31,10 @@ jobs:
           - {gen: Visual Studio 17 2022, arch: x64, config: Debug}
     steps:
     - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+          key: ${{github.job}}-${{matrix.os}}-${{matrix.config}}
     - name: Install Dependencies
       run: |
         choco install nasm

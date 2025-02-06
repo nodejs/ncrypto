@@ -30,6 +30,10 @@ jobs:
     runs-on: ${{matrix.runs-on}}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{github.job}}-${{matrix.os}}-{{matrix.shared}}
       - name: Setup Ninja
         run: sudo apt-get install ninja-build
       - name: Prepare
