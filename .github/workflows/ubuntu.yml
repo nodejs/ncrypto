@@ -1,4 +1,4 @@
-name: Ubuntu 24.04 CI
+name: Ubuntu
 
 on:
   pull_request:
@@ -21,12 +21,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu-build:
-    runs-on: ubuntu-24.04
+  build:
     strategy:
       matrix:
+        runs-on: [ubuntu-24.04]
         shared: [ON, OFF]
         cxx: [g++-14]
+    runs-on: ${{matrix.runs-on}}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Setup Ninja
@@ -36,6 +37,6 @@ jobs:
         env:
           CXX: ${{matrix.cxx}}
       - name: Build
-        run: cmake --build build -j=2
+        run: cmake --build build -j=4
       - name: Test
         run: ctest --output-on-failure --test-dir build

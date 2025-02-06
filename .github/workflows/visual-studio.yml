@@ -1,4 +1,4 @@
-name: VS17 CI
+name: Windows
 
 on:
   pull_request:
@@ -21,9 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: windows-vs17
-    runs-on: windows-latest
+  build:
+    runs-on: windows-2025
     strategy:
       fail-fast: false
       matrix:
