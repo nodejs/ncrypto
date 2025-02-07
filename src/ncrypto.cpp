@@ -1849,6 +1849,12 @@ EVPKeyPointer::EVPKeyPointer(EVP_PKEY* pkey) : pkey_(pkey) {}
 EVPKeyPointer::EVPKeyPointer(EVPKeyPointer&& other) noexcept
     : pkey_(other.release()) {}
 
+EVPKeyPointer EVPKeyPointer::clone() const {
+  if (!pkey_) return {};
+  if (!EVP_PKEY_up_ref(pkey_.get())) return {};
+  return EVPKeyPointer(pkey_.get());
+}
+
 EVPKeyPointer& EVPKeyPointer::operator=(EVPKeyPointer&& other) noexcept {
   if (this == &other) return *this;
   this->~EVPKeyPointer();
@@ -3547,13 +3553,11 @@ DataPointer Cipher::recover(const EVPKeyPointer& key,
 Ec::Ec() : ec_(nullptr) {}
 
 Ec::Ec(OSSL3_CONST EC_KEY* key)
-    : ec_(key),
-      x_(BignumPointer::New()),
-      y_(BignumPointer::New()) {
+    : ec_(key), x_(BignumPointer::New()), y_(BignumPointer::New()) {
   if (ec_ != nullptr) {
     MarkPopErrorOnReturn mark_pop_error_on_return;
-    EC_POINT_get_affine_coordinates(getGroup(),
-        getPublicKey(), x_.get(), y_.get(), nullptr);
+    EC_POINT_get_affine_coordinates(getGroup(), getPublicKey(), x_.get(),
+                                    y_.get(), nullptr);
   }
 }
 
@@ -3567,13 +3571,9 @@ std::string Ec::getCurveName() const {
   return std::string(OBJ_nid2sn(getCurve()));
 }
 
-const EC_POINT* Ec::getPublicKey() const {
-  return EC_KEY_get0_public_key(ec_);
-}
+const EC_POINT* Ec::getPublicKey() const { return EC_KEY_get0_public_key(ec_); }
 
-const BIGNUM* Ec::getPrivateKey() const {
-  return EC_KEY_get0_private_key(ec_);
-}
+const BIGNUM* Ec::getPrivateKey() const { return EC_KEY_get0_private_key(ec_); }
 
 // ============================================================================
 
