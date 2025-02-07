@@ -3546,11 +3546,34 @@ DataPointer Cipher::recover(const EVPKeyPointer& key,
 
 Ec::Ec() : ec_(nullptr) {}
 
-Ec::Ec(OSSL3_CONST EC_KEY* key) : ec_(key) {}
+Ec::Ec(OSSL3_CONST EC_KEY* key)
+    : ec_(key),
+      x_(BignumPointer::New()),
+      y_(BignumPointer::New()) {
+  if (ec_ != nullptr) {
+    MarkPopErrorOnReturn mark_pop_error_on_return;
+    EC_POINT_get_affine_coordinates(getGroup(),
+        getPublicKey(), x_.get(), y_.get(), nullptr);
+  }
+}
 
 const EC_GROUP* Ec::getGroup() const { return ECKeyPointer::GetGroup(ec_); }
 
 int Ec::getCurve() const { return EC_GROUP_get_curve_name(getGroup()); }
+
+uint32_t Ec::getDegree() const { return EC_GROUP_get_degree(getGroup()); }
+
+std::string Ec::getCurveName() const {
+  return std::string(OBJ_nid2sn(getCurve()));
+}
+
+const EC_POINT* Ec::getPublicKey() const {
+  return EC_KEY_get0_public_key(ec_);
+}
+
+const BIGNUM* Ec::getPrivateKey() const {
+  return EC_KEY_get0_private_key(ec_);
+}
 
 // ============================================================================
 
