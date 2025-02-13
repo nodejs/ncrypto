@@ -48,6 +48,12 @@ using OPENSSL_SIZE_T = size_t;
 using OPENSSL_SIZE_T = int;
 #endif
 
+#ifdef OPENSSL_IS_BORINGSSL
+#ifdef NCRYPTO_BSSL_NEEDS_DH_PRIMES
+#include "dh-primes.h"
+#endif  // NCRYPTO_BSSL_NEEDS_DH_PRIMES
+#endif  // OPENSSL_IS_BORINGSSL
+
 namespace ncrypto {
 
 // ============================================================================
