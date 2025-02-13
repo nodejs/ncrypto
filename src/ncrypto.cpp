@@ -9,6 +9,12 @@
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
 
+#ifndef OPENSSL_NO_KDF_H
+#include <openssl/kdf.h>
+#else
+#include <openssl/hkdf.h>
+#endif
+
 #include <algorithm>
 #include <cstring>
 #if OPENSSL_VERSION_MAJOR >= 3
@@ -1659,19 +1665,20 @@ bool hkdfInfo(const EVP_MD* md, const Buffer<const unsigned char>& key,
     return false;
   }
 
-  auto ctx = EVPKeyCtxPointer::NewFromID(EVP_PKEY_HKDF);
-  if (!ctx || !EVP_PKEY_derive_init(ctx.get()) ||
-      !EVP_PKEY_CTX_set_hkdf_md(ctx.get(), md) ||
-      !EVP_PKEY_CTX_add1_hkdf_info(ctx.get(), info.data, info.len)) {
-    return false;
-  }
-
   std::string_view actual_salt;
   static const char default_salt[EVP_MAX_MD_SIZE] = {0};
   if (salt.len > 0) {
     actual_salt = {reinterpret_cast<const char*>(salt.data), salt.len};
   } else {
     actual_salt = {default_salt, static_cast<unsigned>(EVP_MD_size(md))};
+  }
+
+#ifndef OPENSSL_NO_KDF_H
+  auto ctx = EVPKeyCtxPointer::NewFromID(EVP_PKEY_HKDF);
+  if (!ctx || !EVP_PKEY_derive_init(ctx.get()) ||
+      !EVP_PKEY_CTX_set_hkdf_md(ctx.get(), md) ||
+      !EVP_PKEY_CTX_add1_hkdf_info(ctx.get(), info.data, info.len)) {
+    return false;
   }
 
   // We do not use EVP_PKEY_HKDF_MODE_EXTRACT_AND_EXPAND because and instead
@@ -1696,6 +1703,10 @@ bool hkdfInfo(const EVP_MD* md, const Buffer<const unsigned char>& key,
   if (out == nullptr || out->len != length) return false;
 
   return EVP_PKEY_derive(ctx.get(), out->data, &length) > 0;
+#else
+  return HKDF(out->data, length, md, key.data, key.len, salt.data,
+        salt.len, info.data, info.len);
+#endif
 }
 
 DataPointer hkdf(const EVP_MD* md, const Buffer<const unsigned char>& key,
