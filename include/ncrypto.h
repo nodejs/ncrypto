@@ -52,6 +52,8 @@ using OPENSSL_SIZE_T = int;
 #ifdef NCRYPTO_BSSL_NEEDS_DH_PRIMES
 #include "dh-primes.h"
 #endif  // NCRYPTO_BSSL_NEEDS_DH_PRIMES
+// FIXME: This should be removed when patch 0037 is applied
+#define OPENSSL_TLS_SECURITY_LEVEL 1
 #endif  // OPENSSL_IS_BORINGSSL
 
 namespace ncrypto {
@@ -549,6 +551,11 @@ class Ec final {
   inline operator bool() const { return ec_ != nullptr; }
   inline operator OSSL3_CONST EC_KEY*() const { return ec_; }
 
+  static int GetCurveIdFromName(std::string_view name);
+
+  using GetCurveCallback = std::function<bool(std::string_view)>;
+  static bool GetCurves(GetCurveCallback callback);
+
   inline const BignumPointer& getX() const { return x_; }
   inline const BignumPointer& getY() const { return y_; }
   inline const BignumPointer& getD() const { return d_; }
@@ -568,9 +575,31 @@ class DataPointer final {
   static DataPointer Alloc(size_t len);
   static DataPointer Copy(const Buffer<const void>& buffer);
 
+  // Attempts to allocate the buffer space using the secure heap, if
+  // supported/enabled. If the secure heap is disabled, then this
+  // ends up being equivalent to Alloc(len). Note that allocation
+  // will fail if there is not enough free space remaining in the
+  // secure heap space.
+  static DataPointer SecureAlloc(size_t len);
+
+  // If the secure heap is enabled, returns the amount of data that
+  // has been allocated from the heap.
+  static size_t GetSecureHeapUsed();
+
+  enum class InitSecureHeapResult {
+    FAILED,
+    UNABLE_TO_MEMORY_MAP,
+    OK,
+  };
+
+  // Attempt to initialize the secure heap. The secure heap is not
+  // supported on all operating systems and whenever boringssl is
+  // used.
+  static InitSecureHeapResult TryInitSecureHeap(size_t amount, size_t min);
+
   DataPointer() = default;
-  explicit DataPointer(void* data, size_t len);
-  explicit DataPointer(const Buffer<void>& buffer);
+  explicit DataPointer(void* data, size_t len, bool secure = false);
+  explicit DataPointer(const Buffer<void>& buffer, bool secure = false);
   DataPointer(DataPointer&& other) noexcept;
   DataPointer& operator=(DataPointer&& other) noexcept;
   NCRYPTO_DISALLOW_COPY(DataPointer)
@@ -606,9 +635,12 @@ class DataPointer final {
     };
   }
 
+  bool isSecure() const { return secure_; }
+
  private:
   void* data_ = nullptr;
   size_t len_ = 0;
+  bool secure_ = false;
 };
 
 class BIOPointer final {
@@ -1066,6 +1098,8 @@ class SSLPointer final {
   std::optional<std::string_view> getCipherVersion() const;
 
   std::optional<uint32_t> verifyPeerCertificate() const;
+
+  static std::optional<int> getSecurityLevel();
 
   void getCiphers(std::function<void(const std::string_view)> cb) const;
 
