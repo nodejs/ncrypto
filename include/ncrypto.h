@@ -280,7 +280,7 @@ class Digest final {
   static const Digest SHA384;
   static const Digest SHA512;
 
-  static const Digest FromName(std::string_view name);
+  static const Digest FromName(const char* name);
 
  private:
   const EVP_MD* md_ = nullptr;
@@ -298,9 +298,10 @@ class Cipher final {
 #else
   static constexpr size_t MAX_AUTH_TAG_LENGTH = 16;
 #endif
-  static_assert(EVP_GCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
-                EVP_CCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
-                EVP_CHACHAPOLY_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH);
+  // FIXME: These constants are not available in all OpenSSL/BoringSSL versions
+  // static_assert(EVP_GCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
+  //               EVP_CCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
+  //               EVP_CHACHAPOLY_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH);
 
   Cipher() = default;
   Cipher(const EVP_CIPHER* cipher) : cipher_(cipher) {}
@@ -322,7 +323,7 @@ class Cipher final {
   int getKeyLength() const;
   int getBlockSize() const;
   std::string_view getModeLabel() const;
-  std::string_view getName() const;
+  const char* getName() const;
 
   bool isGcmMode() const;
   bool isWrapMode() const;
@@ -339,11 +340,11 @@ class Cipher final {
                  unsigned char* key,
                  unsigned char* iv) const;
 
-  static const Cipher FromName(std::string_view name);
+  static const Cipher FromName(const char* name);
   static const Cipher FromNid(int nid);
   static const Cipher FromCtx(const CipherCtxPointer& ctx);
 
-  using CipherNameCallback = std::function<void(std::string_view name)>;
+  using CipherNameCallback = std::function<void(const char* name)>;
 
   // Iterates the known ciphers if the underlying implementation
   // is able to do so.
@@ -559,9 +560,9 @@ class Ec final {
   inline operator bool() const { return ec_ != nullptr; }
   inline operator OSSL3_CONST EC_KEY*() const { return ec_; }
 
-  static int GetCurveIdFromName(std::string_view name);
+  static int GetCurveIdFromName(const char* name);
 
-  using GetCurveCallback = std::function<bool(std::string_view)>;
+  using GetCurveCallback = std::function<bool(const char*)>;
   static bool GetCurves(GetCurveCallback callback);
 
   inline const BignumPointer& getX() const { return x_; }
@@ -658,7 +659,7 @@ class BIOPointer final {
   static BIOPointer New(const BIO_METHOD* method);
   static BIOPointer New(const void* data, size_t len);
   static BIOPointer New(const BIGNUM* bn);
-  static BIOPointer NewFile(std::string_view filename, std::string_view mode);
+  static BIOPointer NewFile(const char* filename, const char* mode);
   static BIOPointer NewFp(FILE* fd, int flags);
 
   template <typename T>
@@ -962,9 +963,8 @@ class DHPointer final {
   static BignumPointer GetStandardGenerator();
 
   static BignumPointer FindGroup(
-      const std::string_view name,
-      FindGroupOption option = FindGroupOption::NONE);
-  static DHPointer FromGroup(const std::string_view name,
+      std::string_view name, FindGroupOption option = FindGroupOption::NONE);
+  static DHPointer FromGroup(std::string_view name,
                              FindGroupOption option = FindGroupOption::NONE);
 
   static DHPointer New(BignumPointer&& p, BignumPointer&& g);
@@ -1063,7 +1063,7 @@ class SSLCtxPointer final {
     SSL_CTX_set_tlsext_status_arg(get(), nullptr);
   }
 
-  bool setCipherSuites(std::string_view ciphers);
+  bool setCipherSuites(const char* ciphers);
 
   static SSLCtxPointer NewServer();
   static SSLCtxPointer NewClient();
@@ -1092,8 +1092,8 @@ class SSLPointer final {
   bool setSession(const SSLSessionPointer& session);
   bool setSniContext(const SSLCtxPointer& ctx) const;
 
-  const std::string_view getClientHelloAlpn() const;
-  const std::string_view getClientHelloServerName() const;
+  const char* getClientHelloAlpn() const;
+  const char* getClientHelloServerName() const;
 
   std::optional<const std::string_view> getServerName() const;
   X509View getCertificate() const;
@@ -1109,7 +1109,7 @@ class SSLPointer final {
 
   static std::optional<int> getSecurityLevel();
 
-  void getCiphers(std::function<void(const std::string_view)> cb) const;
+  void getCiphers(std::function<void(const char*)> cb) const;
 
   static SSLPointer New(const SSLCtxPointer& ctx);
   static std::optional<const std::string_view> GetServerName(const SSL* ssl);
@@ -1205,13 +1205,13 @@ class X509View final {
     INVALID_NAME,
     OPERATION_FAILED,
   };
-  CheckMatch checkHost(const std::string_view host,
+  CheckMatch checkHost(std::string_view host,
                        int flags,
                        DataPointer* peerName = nullptr) const;
-  CheckMatch checkEmail(const std::string_view email, int flags) const;
-  CheckMatch checkIp(const std::string_view ip, int flags) const;
+  CheckMatch checkEmail(std::string_view email, int flags) const;
+  CheckMatch checkIp(std::string_view ip, int flags) const;
 
-  using UsageCallback = std::function<void(std::string_view)>;
+  using UsageCallback = std::function<void(const char*)>;
   bool enumUsages(UsageCallback callback) const;
 
   template <typename T>
@@ -1248,8 +1248,8 @@ class X509Pointer final {
   X509View view() const;
   operator X509View() const { return view(); }
 
-  static std::string_view ErrorCode(int32_t err);
-  static std::optional<std::string_view> ErrorReason(int32_t err);
+  static const char* ErrorCode(int32_t err);
+  static std::optional<const char*> ErrorReason(int32_t err);
 
  private:
   DeleteFnPtr<X509, X509_free> cert_;
@@ -1465,7 +1465,7 @@ class EnginePointer final {
 
   bool setAsDefault(uint32_t flags, CryptoErrorList* errors = nullptr);
   bool init(bool finish_on_exit = false);
-  EVPKeyPointer loadPrivateKey(const std::string_view key_name);
+  EVPKeyPointer loadPrivateKey(const char* key_name);
 
   // Release ownership of the ENGINE* pointer.
   ENGINE* release();
@@ -1473,7 +1473,7 @@ class EnginePointer final {
   // Retrieve an OpenSSL Engine instance by name. If the name does not
   // identify a valid named engine, the returned EnginePointer will be
   // empty.
-  static EnginePointer getEngineByName(const std::string_view name,
+  static EnginePointer getEngineByName(const char* name,
                                        CryptoErrorList* errors = nullptr);
 
   // Call once when initializing OpenSSL at startup for the process.
@@ -1530,8 +1530,8 @@ DataPointer ExportChallenge(const Buffer<const char>& buf);
 // ============================================================================
 // KDF
 
-const EVP_MD* getDigestByName(const std::string_view name);
-const EVP_CIPHER* getCipherByName(const std::string_view name);
+const EVP_MD* getDigestByName(const char* name);
+const EVP_CIPHER* getCipherByName(const char* name);
 
 // Verify that the specified HKDF output length is valid for the given digest.
 // The maximum length for HKDF output for a given digest is 255 times the
