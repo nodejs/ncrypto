@@ -52,8 +52,6 @@ using OPENSSL_SIZE_T = int;
 #ifdef NCRYPTO_BSSL_NEEDS_DH_PRIMES
 #include "dh-primes.h"
 #endif  // NCRYPTO_BSSL_NEEDS_DH_PRIMES
-// FIXME: This should be removed when patch 0037 is applied
-#define OPENSSL_TLS_SECURITY_LEVEL 1
 #endif  // OPENSSL_IS_BORINGSSL
 
 namespace ncrypto {
