@@ -39,10 +39,10 @@ jobs:
       matrix:
         shared: [ON, OFF]
         include:
-          - cc: gcc-12
-            cxx: g++-12
-          - cc: clang-14
-            cxx: clang++-14
+          - cc: gcc-14
+            cxx: g++-14
+          - cc: clang-18
+            cxx: clang++-18
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
