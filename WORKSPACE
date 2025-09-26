@@ -8,4 +8,8 @@ http_archive(
     strip_prefix = "boringssl-0.20250818.0",
     type = "tgz",
     urls = ["https://github.com/google/boringssl/archive/refs/tags/0.20250818.0.tar.gz"],
+    patches = [
+         "@ncrypto//:patches/0001-Expose-libdecrepit-so-NodeJS-can-use-it-for-ncrypto.patch"
+    ],
+    patch_strip = 1
 )
