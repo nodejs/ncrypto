@@ -12,13 +12,21 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
+#include <stdint.h>
 #include <cstddef>
+#include <cstdio>
 #include <functional>
 #include <list>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
+
+#if NCRYPTO_DEVELOPMENT_CHECKS
+#include <iostream>
+#endif
+
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif  // !OPENSSL_NO_ENGINE
