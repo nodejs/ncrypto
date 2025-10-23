@@ -1,12 +1,36 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+bool_flag(
+    name = "bssl_libdecrepit_missing",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "cfg_bssl_libdecrepit_missing",
+    flag_values = {
+        "bssl_libdecrepit_missing": "True",
+    },
+)
+
 cc_library(
     name = "ncrypto",
     srcs = glob(["src/*.cpp"]),
     hdrs = glob(["include/*.h"]),
     includes = ["include"],
+    local_defines = {
+        "NCRYPTO_BSSL_LIBDECREPIT_MISSING": select(
+            {
+                ":cfg_bssl_libdecrepit_missing": 1,
+                "//conditions:default": 0,
+            },
+        ),
+    },
     visibility = ["//visibility:public"],
     deps = [
-	"@ssl//:ssl",
-	"@ssl//:crypto",
-	"@ssl//:decrepit"
-    ]
+        "@ssl",
+        "@ssl//:crypto",
+    ] + select({
+        ":cfg_bssl_libdecrepit_missing": [],
+        "//conditions:default": ["@ssl//:decrepit"],
+    }),
 )
