@@ -15,9 +15,9 @@ include(cmake/CPM.cmake)
 
 CPMAddPackage(
     NAME boringssl
-    VERSION 0.20250114.0
+    VERSION 0.20250818.0
     GITHUB_REPOSITORY google/boringssl
-    GIT_TAG 0.20250114.0
+    GIT_TAG 0.20250818.0
     OPTIONS "BUILD_SHARED_LIBS OFF" "BUILD_TESTING OFF"
 )
 add_subdirectory(src)
