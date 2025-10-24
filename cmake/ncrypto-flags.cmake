@@ -1,5 +1,6 @@
 option(NCRYPTO_DEVELOPMENT_CHECKS "development checks (useful for debugging)" OFF)
 option(NCRYPTO_TESTING "Build tests" ON)
+option(NCRYPTO_BSSL_LIBDECREPIT_MISSING "enable if boringssl is built without libdecrepit" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
