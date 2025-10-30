@@ -3226,6 +3226,36 @@ bool SSLCtxPointer::setCipherSuites(const char* ciphers) {
   return true;
 #endif
 }
+// ============================================================================
+
+template <typename T>
+std::string_view ModeMixin<T>::getModeLabel() const {
+  switch (self().getMode()) {
+    case EVP_CIPH_CCM_MODE:
+      return "ccm";
+    case EVP_CIPH_CFB_MODE:
+      return "cfb";
+    case EVP_CIPH_CBC_MODE:
+      return "cbc";
+    case EVP_CIPH_CTR_MODE:
+      return "ctr";
+    case EVP_CIPH_ECB_MODE:
+      return "ecb";
+    case EVP_CIPH_GCM_MODE:
+      return "gcm";
+    case EVP_CIPH_OCB_MODE:
+      return "ocb";
+    case EVP_CIPH_OFB_MODE:
+      return "ofb";
+    case EVP_CIPH_WRAP_MODE:
+      return "wrap";
+    case EVP_CIPH_XTS_MODE:
+      return "xts";
+    case EVP_CIPH_STREAM_CIPHER:
+      return "stream";
+  }
+  return "{unknown}";
+}
 
 // ============================================================================
 
@@ -3263,43 +3293,13 @@ const Cipher Cipher::AES_256_OCB = Cipher::FromNid(NID_aes_256_ocb);
 
 const Cipher Cipher::CHACHA20_POLY1305 = Cipher::FromNid(NID_chacha20_poly1305);
 
-bool Cipher::isGcmMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_GCM_MODE;
-}
-
-bool Cipher::isWrapMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_WRAP_MODE;
-}
-
-bool Cipher::isCtrMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_CTR_MODE;
-}
-
-bool Cipher::isCcmMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_CCM_MODE;
-}
-
-bool Cipher::isOcbMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_OCB_MODE;
-}
-
-bool Cipher::isStreamMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_STREAM_CIPHER;
-}
-
 bool Cipher::isChaCha20Poly1305() const {
   if (!cipher_) return false;
   return getNid() == NID_chacha20_poly1305;
 }
 
 int Cipher::getMode() const {
-  if (!cipher_) return 0;
+  if (!cipher_) return -1;
   return EVP_CIPHER_mode(cipher_);
 }
 
@@ -3321,35 +3321,6 @@ int Cipher::getBlockSize() const {
 int Cipher::getNid() const {
   if (!cipher_) return 0;
   return EVP_CIPHER_nid(cipher_);
-}
-
-std::string_view Cipher::getModeLabel() const {
-  if (!cipher_) return {};
-  switch (getMode()) {
-    case EVP_CIPH_CCM_MODE:
-      return "ccm";
-    case EVP_CIPH_CFB_MODE:
-      return "cfb";
-    case EVP_CIPH_CBC_MODE:
-      return "cbc";
-    case EVP_CIPH_CTR_MODE:
-      return "ctr";
-    case EVP_CIPH_ECB_MODE:
-      return "ecb";
-    case EVP_CIPH_GCM_MODE:
-      return "gcm";
-    case EVP_CIPH_OCB_MODE:
-      return "ocb";
-    case EVP_CIPH_OFB_MODE:
-      return "ofb";
-    case EVP_CIPH_WRAP_MODE:
-      return "wrap";
-    case EVP_CIPH_XTS_MODE:
-      return "xts";
-    case EVP_CIPH_STREAM_CIPHER:
-      return "stream";
-  }
-  return "{unknown}";
 }
 
 const char* Cipher::getName() const {
@@ -3381,6 +3352,8 @@ int Cipher::bytesToKey(const Digest& digest,
   return EVP_BytesToKey(
       *this, Digest::MD5, nullptr, input.data, input.len, 1, key, iv);
 }
+
+template class ModeMixin<Cipher>;
 
 namespace {
 struct CipherCallbackContext {
@@ -5040,6 +5013,265 @@ DataPointer KEM::Decapsulate(const EVPKeyPointer& private_key,
 
 #endif  // OPENSSL_VERSION_MAJOR >= 3
 
+// ============================================================================
+// AEAD (Authenticated Encryption with Associated Data)
+#ifdef OPENSSL_IS_BORINGSSL
+
+const AEAD AEAD::FromName(const char* name) {
+  for (const auto& [construct, info] : aeadIndex) {
+    if (EqualNoCase(info.name, name)) {
+      return AEAD(&info, construct());
+    }
+  }
+
+  return AEAD();
+}
+
+const AEAD AEAD::FromCtx(std::string_view name, const AEADCtxPointer& ctx) {
+  for (const auto& [_, info] : aeadIndex) {
+    if (info.name == name) {
+      return AEAD(&info, EVP_AEAD_CTX_aead(ctx.get()));
+    }
+  }
+
+  return AEAD();
+}
+
+int AEAD::getMode() const {
+  if (!aead_) return -1;
+
+  return info_->mode;
+}
+
+int AEAD::getNonceLength() const {
+  if (!aead_) return 0;
+  return EVP_AEAD_nonce_length(aead_);
+}
+
+int AEAD::getKeyLength() const {
+  if (!aead_) return 0;
+  return EVP_AEAD_key_length(aead_);
+}
+
+int AEAD::getMaxOverhead() const {
+  if (!aead_) return 0;
+  return EVP_AEAD_max_overhead(aead_);
+}
+
+int AEAD::getMaxTagLength() const {
+  if (!aead_) return 0;
+  return EVP_AEAD_max_tag_len(aead_);
+}
+
+int AEAD::getBlockSize() const {
+  if (!aead_) return 0;
+
+  // EVP_CIPHER_CTX_block_size returns the block size, in bytes, of the cipher
+  // underlying |ctx|, or one if the cipher is a stream cipher.
+  return 1;
+}
+
+std::string_view AEAD::getName() const {
+  if (!aead_) return "";
+
+  return info_->name;
+}
+
+const AEAD AEAD::FromConstructor(AEAD::AEADConstructor construct) {
+  return AEAD(&aeadIndex.at(construct), construct());
+}
+
+const std::unordered_map<AEAD::AEADConstructor, AEAD::AEADInfo>
+    AEAD::aeadIndex = {{EVP_aead_aes_128_gcm,
+                        {.name = LN_aes_128_gcm,
+                         .mode = EVP_CIPH_GCM_MODE,
+                         .nid = NID_aes_128_gcm}},
+                       {EVP_aead_aes_192_gcm,
+                        {.name = LN_aes_192_gcm,
+                         .mode = EVP_CIPH_GCM_MODE,
+                         .nid = NID_aes_192_gcm}},
+                       {EVP_aead_aes_256_gcm,
+                        {.name = LN_aes_256_gcm,
+                         .mode = EVP_CIPH_GCM_MODE,
+                         .nid = NID_aes_256_gcm}},
+                       {EVP_aead_chacha20_poly1305,
+                        {.name = LN_chacha20_poly1305,
+                         .mode = EVP_CIPH_STREAM_CIPHER,
+                         .nid = NID_chacha20_poly1305}},
+                       {EVP_aead_xchacha20_poly1305,
+                        {
+                            .name = "xchacha20-poly1305",
+                            .mode = EVP_CIPH_STREAM_CIPHER,
+                        }},
+                       {EVP_aead_aes_128_ctr_hmac_sha256,
+                        {
+                            .name = "aes-128-ctr-hmac-sha256",
+                            .mode = EVP_CIPH_CTR_MODE,
+                        }},
+                       {EVP_aead_aes_256_ctr_hmac_sha256,
+                        {
+                            .name = "aes-256-ctr-hmac-sha256",
+                            .mode = EVP_CIPH_CTR_MODE,
+                        }},
+                       {EVP_aead_aes_128_gcm_siv,
+                        {
+                            .name = "aes-128-gcm-siv",
+                            .mode = EVP_CIPH_GCM_MODE,
+                        }},
+                       {EVP_aead_aes_256_gcm_siv,
+                        {
+                            .name = "aes-256-gcm-siv",
+                            .mode = EVP_CIPH_GCM_MODE,
+                        }},
+                       {EVP_aead_aes_128_gcm_randnonce,
+                        {
+                            .name = "aes-128-gcm-randnonce",
+                            .mode = EVP_CIPH_GCM_MODE,
+                        }},
+                       {EVP_aead_aes_256_gcm_randnonce,
+                        {
+                            .name = "aes-256-gcm-randnonce",
+                            .mode = EVP_CIPH_GCM_MODE,
+                        }},
+                       {EVP_aead_aes_128_ccm_bluetooth,
+                        {
+                            .name = "aes-128-ccm-bluetooth",
+                            .mode = EVP_CIPH_CCM_MODE,
+                        }},
+                       {EVP_aead_aes_128_ccm_bluetooth_8,
+                        {
+                            .name = "aes-128-ccm-bluetooth-8",
+                            .mode = EVP_CIPH_CCM_MODE,
+                        }},
+                       {EVP_aead_aes_128_ccm_matter,
+                        {
+                            .name = "aes-128-ccm-matter",
+                            .mode = EVP_CIPH_CCM_MODE,
+                        }}};
+
+const AEAD AEAD::EMPTY = AEAD();
+const AEAD AEAD::AES_128_GCM = AEAD::FromConstructor(EVP_aead_aes_128_gcm);
+const AEAD AEAD::AES_192_GCM = AEAD::FromConstructor(EVP_aead_aes_192_gcm);
+const AEAD AEAD::AES_256_GCM = AEAD::FromConstructor(EVP_aead_aes_256_gcm);
+const AEAD AEAD::CHACHA20_POLY1305 =
+    AEAD::FromConstructor(EVP_aead_chacha20_poly1305);
+const AEAD AEAD::XCHACHA20_POLY1305 =
+    AEAD::FromConstructor(EVP_aead_xchacha20_poly1305);
+const AEAD AEAD::AES_128_CTR_HMAC_SHA256 =
+    AEAD::FromConstructor(EVP_aead_aes_128_ctr_hmac_sha256);
+const AEAD AEAD::AES_256_CTR_HMAC_SHA256 =
+    AEAD::FromConstructor(EVP_aead_aes_256_ctr_hmac_sha256);
+const AEAD AEAD::AES_128_GCM_SIV =
+    AEAD::FromConstructor(EVP_aead_aes_128_gcm_siv);
+const AEAD AEAD::AES_256_GCM_SIV =
+    AEAD::FromConstructor(EVP_aead_aes_256_gcm_siv);
+const AEAD AEAD::AES_128_GCM_RANDNONCE =
+    AEAD::FromConstructor(EVP_aead_aes_128_gcm_randnonce);
+const AEAD AEAD::AES_256_GCM_RANDNONCE =
+    AEAD::FromConstructor(EVP_aead_aes_256_gcm_randnonce);
+const AEAD AEAD::AES_128_CCM_BLUETOOTH =
+    AEAD::FromConstructor(EVP_aead_aes_128_ccm_bluetooth);
+const AEAD AEAD::AES_128_CCM_BLUETOOTH_8 =
+    AEAD::FromConstructor(EVP_aead_aes_128_ccm_bluetooth_8);
+const AEAD AEAD::AES_128_CCM_MATTER =
+    AEAD::FromConstructor(EVP_aead_aes_128_ccm_matter);
+// const AEAD AEAD::AES_128_EAX = AEAD::FromConstructor(EVP_aead_aes_128_eax);
+// const AEAD AEAD::AES_256_EAX = AEAD::FromConstructor(EVP_aead_aes_256_eax);
+
+template class ModeMixin<AEAD>;
+
+AEADCtxPointer AEADCtxPointer::New(const AEAD& aead,
+                                   bool encrypt,
+                                   const unsigned char* key,
+                                   size_t keyLen,
+                                   size_t tagLen) {
+  // Note: In the EVP_AEAD API new always calls init
+  auto ret = AEADCtxPointer(EVP_AEAD_CTX_new(aead.get(), key, keyLen, tagLen));
+
+  if (!ret) {
+    return {};
+  }
+
+  return ret;
+}
+
+AEADCtxPointer::AEADCtxPointer(EVP_AEAD_CTX* ctx) : ctx_(ctx) {}
+
+AEADCtxPointer::AEADCtxPointer(AEADCtxPointer&& other) noexcept
+    : ctx_(other.release()) {}
+
+AEADCtxPointer& AEADCtxPointer::operator=(AEADCtxPointer&& other) noexcept {
+  if (this == &other) return *this;
+  this->~AEADCtxPointer();
+  return *new (this) AEADCtxPointer(std::move(other));
+}
+
+AEADCtxPointer::~AEADCtxPointer() {
+  reset();
+}
+
+void AEADCtxPointer::reset(EVP_AEAD_CTX* ctx) {
+  ctx_.reset(ctx);
+}
+
+EVP_AEAD_CTX* AEADCtxPointer::release() {
+  return ctx_.release();
+}
+
+bool AEADCtxPointer::init(const AEAD& aead,
+                          bool encrypt,
+                          const unsigned char* key,
+                          size_t keyLen,
+                          size_t tagLen) {
+  return EVP_AEAD_CTX_init_with_direction(
+      ctx_.get(),
+      aead,
+      key,
+      keyLen,
+      tagLen,
+      encrypt ? evp_aead_seal : evp_aead_open);
+}
+
+bool AEADCtxPointer::encrypt(const Buffer<const unsigned char>& in,
+                             Buffer<unsigned char>& out,
+                             Buffer<unsigned char>& tag,
+                             const Buffer<const unsigned char>& nonce,
+                             const Buffer<const unsigned char>& aad) {
+  if (!ctx_) return false;
+  return EVP_AEAD_CTX_seal_scatter(ctx_.get(),
+                                   out.data,
+                                   tag.data,
+                                   &tag.len,
+                                   tag.len,
+                                   nonce.data,
+                                   nonce.len,
+                                   in.data,
+                                   in.len,
+                                   nullptr /* extra_in */,
+                                   0 /* extra_in_len */,
+                                   aad.data,
+                                   aad.len) == 1;
+}
+
+bool AEADCtxPointer::decrypt(const Buffer<const unsigned char>& in,
+                             Buffer<unsigned char>& out,
+                             const Buffer<const unsigned char>& tag,
+                             const Buffer<const unsigned char>& nonce,
+                             const Buffer<const unsigned char>& aad) {
+  if (!ctx_) return false;
+
+  return EVP_AEAD_CTX_open_gather(ctx_.get(),
+                                  out.data,
+                                  nonce.data,
+                                  nonce.len,
+                                  in.data,
+                                  in.len,
+                                  tag.data,
+                                  tag.len,
+                                  aad.data,
+                                  aad.len) == 1;
+}
+#endif
 }  // namespace ncrypto
 
 // ===========================================================================
