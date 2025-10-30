@@ -9,7 +9,7 @@ using namespace ncrypto;
 struct TestBuf : public std::string {
   TestBuf(const std::string& constStr)
       : std::string(constStr),
-        buf(reinterpret_cast<unsigned char*>(data()), size()) {}
+        buf{reinterpret_cast<unsigned char*>(data()), size()} {}
   TestBuf(size_t n) : TestBuf(std::string(n, 0)) {}
 
   operator Buffer<unsigned char>&() { return buf; }
