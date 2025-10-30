@@ -12,6 +12,10 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
+#ifdef OPENSSL_IS_BORINGSSL
+#include <openssl/aead.h>
+#endif
+
 #include <stdint.h>
 #include <cstddef>
 #include <cstdio>
@@ -21,6 +25,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #if NCRYPTO_DEVELOPMENT_CHECKS
@@ -257,6 +262,8 @@ class ECKeyPointer;
 class Dsa;
 class Rsa;
 class Ec;
+class AEAD;
+class AEADCtxPointer;
 
 struct StackOfXASN1Deleter {
   void operator()(STACK_OF(ASN1_OBJECT) * p) const {
@@ -1733,6 +1740,130 @@ class KEM final {
 };
 
 #endif  // OPENSSL_VERSION_MAJOR >= 3
+
+// ============================================================================
+// AEAD (Authenticated Encryption with Associated Data)
+// Note that AEAD primitives are accessed through the Cipher class instead, if
+// using OpenSSL.
+
+#ifdef OPENSSL_IS_BORINGSSL
+class AEAD final : public ModeMixin<AEAD> {
+ private:
+  // BoringSSL does not keep a list of AEADs, so we need to maintain our own.
+  struct AEADInfo {
+    std::string name;
+    int mode;
+    int nid = 0;  // Note: BoringSSL only defines NIDs for some AEADs
+  };
+
+ public:
+  AEAD() = default;
+  AEAD(const AEADInfo* info, const EVP_AEAD* aead) : info_(info), aead_(aead) {}
+  AEAD(const AEAD&) = default;
+  AEAD& operator=(const AEAD&) = default;
+  NCRYPTO_DISALLOW_MOVE(AEAD)
+
+  inline const EVP_AEAD* get() const { return aead_; }
+  inline operator const EVP_AEAD*() const { return aead_; }
+  inline operator bool() const { return aead_ != nullptr; }
+
+  int getMode() const;
+  int getNonceLength() const;
+  int getKeyLength() const;
+  int getBlockSize() const;
+  int getMaxOverhead() const;
+  int getMaxTagLength() const;
+  std::string_view getName() const;
+
+  static const AEAD FromName(const char* name);
+
+  // TODO(npaun): BoringSSL does not define NIDs for all AEADs.
+  // Decide if we will even implement this method.
+  // int getNid() const;
+  // static const AEAD FromNid(int nid);
+
+  static const AEAD FromCtx(std::string_view name, const AEADCtxPointer& ctx);
+
+  // Utilities to get various AEADs by type.
+
+  static const AEAD EMPTY;
+  static const AEAD AES_128_GCM;
+  static const AEAD AES_192_GCM;
+  static const AEAD AES_256_GCM;
+  static const AEAD CHACHA20_POLY1305;
+  static const AEAD XCHACHA20_POLY1305;
+  static const AEAD AES_128_CTR_HMAC_SHA256;
+  static const AEAD AES_256_CTR_HMAC_SHA256;
+  static const AEAD AES_128_GCM_SIV;
+  static const AEAD AES_256_GCM_SIV;
+  static const AEAD AES_128_GCM_RANDNONCE;
+  static const AEAD AES_256_GCM_RANDNONCE;
+  static const AEAD AES_128_CCM_BLUETOOTH;
+  static const AEAD AES_128_CCM_BLUETOOTH_8;
+  static const AEAD AES_128_CCM_MATTER;
+  // static const AEAD AES_128_EAX;
+  // static const AEAD AES_256_EAX;
+
+ private:
+  const EVP_AEAD* aead_ = nullptr;
+  const AEADInfo* info_ = nullptr;
+
+  using AEADConstructor = const EVP_AEAD* (*)();
+  static const std::unordered_map<AEADConstructor, AEADInfo> aeadIndex;
+  static const AEAD FromConstructor(AEADConstructor construct);
+};
+
+class AEADCtxPointer final {
+ public:
+  static AEADCtxPointer New(
+      const AEAD& aead,
+      bool encrypt,
+      const unsigned char* key = nullptr,
+      size_t keyLen = 0,
+      size_t tagLen = EVP_AEAD_DEFAULT_TAG_LENGTH /* = 0 */);
+
+  AEADCtxPointer() = default;
+  explicit AEADCtxPointer(EVP_AEAD_CTX* ctx);
+  AEADCtxPointer(AEADCtxPointer&& other) noexcept;
+  AEADCtxPointer& operator=(AEADCtxPointer&& other) noexcept;
+  NCRYPTO_DISALLOW_COPY(AEADCtxPointer)
+  ~AEADCtxPointer();
+
+  inline bool operator==(std::nullptr_t) const noexcept {
+    return ctx_ == nullptr;
+  }
+  inline operator bool() const { return ctx_ != nullptr; }
+  inline EVP_AEAD_CTX* get() const { return ctx_.get(); }
+  inline operator EVP_AEAD_CTX*() const { return ctx_.get(); }
+  void reset(EVP_AEAD_CTX* ctx = nullptr);
+  EVP_AEAD_CTX* release();
+
+  bool init(const AEAD& aead,
+            bool encrypt,
+            const unsigned char* key = nullptr,
+            size_t keyLen = 0,
+            size_t tagLen = EVP_AEAD_DEFAULT_TAG_LENGTH /* = 0 */);
+
+  // TODO(npaun): BoringSSL does not define NIDs for all AEADs.
+  // Decide if we will even implement this method.
+  // int getNid() const;
+
+  bool encrypt(const Buffer<const unsigned char>& in,
+               Buffer<unsigned char>& out,
+               Buffer<unsigned char>& tag,
+               const Buffer<const unsigned char>& nonce,
+               const Buffer<const unsigned char>& aad);
+
+  bool decrypt(const Buffer<const unsigned char>& in,
+               Buffer<unsigned char>& out,
+               const Buffer<const unsigned char>& tag,
+               const Buffer<const unsigned char>& nonce,
+               const Buffer<const unsigned char>& aad);
+
+ private:
+  DeleteFnPtr<EVP_AEAD_CTX, EVP_AEAD_CTX_free> ctx_;
+};
+#endif
 
 // ============================================================================
 // Version metadata
