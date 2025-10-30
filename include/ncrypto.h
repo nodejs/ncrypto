@@ -318,7 +318,25 @@ DataPointer xofHashDigest(const Buffer<const unsigned char>& data,
                           const EVP_MD* md,
                           size_t length);
 
-class Cipher final {
+template <typename T>
+class ModeMixin {
+ public:
+  std::string_view getModeLabel() const;
+
+  bool isGcmMode() const { return self().getMode() == EVP_CIPH_GCM_MODE; }
+  bool isWrapMode() const { return self().getMode() == EVP_CIPH_WRAP_MODE; }
+  bool isCtrMode() const { return self().getMode() == EVP_CIPH_CTR_MODE; }
+  bool isCcmMode() const { return self().getMode() == EVP_CIPH_CCM_MODE; }
+  bool isOcbMode() const { return self().getMode() == EVP_CIPH_OCB_MODE; }
+  bool isStreamMode() const {
+    return self().getMode() == EVP_CIPH_STREAM_CIPHER;
+  }
+
+ private:
+  const T& self() const { return static_cast<const T&>(*this); }
+};
+
+class Cipher final : public ModeMixin<Cipher> {
  public:
   static constexpr size_t MAX_KEY_LENGTH = EVP_MAX_KEY_LENGTH;
   static constexpr size_t MAX_IV_LENGTH = EVP_MAX_IV_LENGTH;
@@ -351,15 +369,9 @@ class Cipher final {
   int getIvLength() const;
   int getKeyLength() const;
   int getBlockSize() const;
-  std::string_view getModeLabel() const;
+
   const char* getName() const;
 
-  bool isGcmMode() const;
-  bool isWrapMode() const;
-  bool isCtrMode() const;
-  bool isCcmMode() const;
-  bool isOcbMode() const;
-  bool isStreamMode() const;
   bool isChaCha20Poly1305() const;
 
   bool isSupportedAuthenticatedMode() const;

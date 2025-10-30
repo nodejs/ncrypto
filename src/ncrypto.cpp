@@ -3226,6 +3226,36 @@ bool SSLCtxPointer::setCipherSuites(const char* ciphers) {
   return true;
 #endif
 }
+// ============================================================================
+
+template <typename T>
+std::string_view ModeMixin<T>::getModeLabel() const {
+  switch (self().getMode()) {
+    case EVP_CIPH_CCM_MODE:
+      return "ccm";
+    case EVP_CIPH_CFB_MODE:
+      return "cfb";
+    case EVP_CIPH_CBC_MODE:
+      return "cbc";
+    case EVP_CIPH_CTR_MODE:
+      return "ctr";
+    case EVP_CIPH_ECB_MODE:
+      return "ecb";
+    case EVP_CIPH_GCM_MODE:
+      return "gcm";
+    case EVP_CIPH_OCB_MODE:
+      return "ocb";
+    case EVP_CIPH_OFB_MODE:
+      return "ofb";
+    case EVP_CIPH_WRAP_MODE:
+      return "wrap";
+    case EVP_CIPH_XTS_MODE:
+      return "xts";
+    case EVP_CIPH_STREAM_CIPHER:
+      return "stream";
+  }
+  return "{unknown}";
+}
 
 // ============================================================================
 
@@ -3263,43 +3293,13 @@ const Cipher Cipher::AES_256_OCB = Cipher::FromNid(NID_aes_256_ocb);
 
 const Cipher Cipher::CHACHA20_POLY1305 = Cipher::FromNid(NID_chacha20_poly1305);
 
-bool Cipher::isGcmMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_GCM_MODE;
-}
-
-bool Cipher::isWrapMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_WRAP_MODE;
-}
-
-bool Cipher::isCtrMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_CTR_MODE;
-}
-
-bool Cipher::isCcmMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_CCM_MODE;
-}
-
-bool Cipher::isOcbMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_OCB_MODE;
-}
-
-bool Cipher::isStreamMode() const {
-  if (!cipher_) return false;
-  return getMode() == EVP_CIPH_STREAM_CIPHER;
-}
-
 bool Cipher::isChaCha20Poly1305() const {
   if (!cipher_) return false;
   return getNid() == NID_chacha20_poly1305;
 }
 
 int Cipher::getMode() const {
-  if (!cipher_) return 0;
+  if (!cipher_) return -1;
   return EVP_CIPHER_mode(cipher_);
 }
 
@@ -3321,35 +3321,6 @@ int Cipher::getBlockSize() const {
 int Cipher::getNid() const {
   if (!cipher_) return 0;
   return EVP_CIPHER_nid(cipher_);
-}
-
-std::string_view Cipher::getModeLabel() const {
-  if (!cipher_) return {};
-  switch (getMode()) {
-    case EVP_CIPH_CCM_MODE:
-      return "ccm";
-    case EVP_CIPH_CFB_MODE:
-      return "cfb";
-    case EVP_CIPH_CBC_MODE:
-      return "cbc";
-    case EVP_CIPH_CTR_MODE:
-      return "ctr";
-    case EVP_CIPH_ECB_MODE:
-      return "ecb";
-    case EVP_CIPH_GCM_MODE:
-      return "gcm";
-    case EVP_CIPH_OCB_MODE:
-      return "ocb";
-    case EVP_CIPH_OFB_MODE:
-      return "ofb";
-    case EVP_CIPH_WRAP_MODE:
-      return "wrap";
-    case EVP_CIPH_XTS_MODE:
-      return "xts";
-    case EVP_CIPH_STREAM_CIPHER:
-      return "stream";
-  }
-  return "{unknown}";
 }
 
 const char* Cipher::getName() const {
@@ -3381,6 +3352,8 @@ int Cipher::bytesToKey(const Digest& digest,
   return EVP_BytesToKey(
       *this, Digest::MD5, nullptr, input.data, input.len, 1, key, iv);
 }
+
+template class ModeMixin<Cipher>;
 
 namespace {
 struct CipherCallbackContext {
