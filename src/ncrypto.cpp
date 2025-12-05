@@ -8,7 +8,6 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
-#include "openssl/cipher.h"
 
 #ifndef NCRYPTO_NO_KDF_H
 #include <openssl/kdf.h>
