@@ -81,6 +81,13 @@ namespace ncrypto {
 // ============================================================================
 // Utility macros
 
+inline bool EqualNoCase(const std::string_view a, const std::string_view b) {
+  if (a.size() != b.size()) return false;
+  return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](char a, char b) {
+    return std::tolower(a) == std::tolower(b);
+  });
+}
+
 #if NCRYPTO_DEVELOPMENT_CHECKS
 #define NCRYPTO_STR(x) #x
 #define NCRYPTO_REQUIRE(EXPR)                                                  \
