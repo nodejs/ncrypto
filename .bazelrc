@@ -1,2 +1,1 @@
-common --enable_workspace
 build --cxxopt="-std=c++20"
