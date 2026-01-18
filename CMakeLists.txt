@@ -3,6 +3,7 @@ project(ncrypto VERSION 1.0.1)
 
 include(CTest)
 include(GNUInstallDirs)
+include(cmake/ncrypto-flags.cmake)
 
 if (NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
