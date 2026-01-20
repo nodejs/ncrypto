@@ -8,7 +8,6 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
-#include "openssl/cipher.h"
 
 #ifndef NCRYPTO_NO_KDF_H
 #include <openssl/kdf.h>
@@ -473,11 +472,9 @@ int BignumPointer::isPrime(int nchecks,
         // TODO(@jasnell): This could be refactored to allow inlining.
         // Not too important right now tho.
         [](int a, int b, BN_GENCB* ctx) mutable -> int {
-          PrimeCheckCallback& ptr = *static_cast<PrimeCheckCallback*>(ctx->arg);
-          // Newer versions of openssl and boringssl define the BN_GENCB_get_arg
-          // API which is what is supposed to be used here. Older versions,
-          // however, omit that API.
-          // *static_cast<PrimeCheckCallback*>(BN_GENCB_get_arg(ctx));
+          // BN_GENCB is opaque in OpenSSL 3.x, must use accessor
+          PrimeCheckCallback& ptr =
+              *static_cast<PrimeCheckCallback*>(BN_GENCB_get_arg(ctx));
           return ptr(a, b) ? 1 : 0;
         },
         &innerCb);
@@ -507,11 +504,9 @@ bool BignumPointer::generate(const PrimeConfig& params,
     BN_GENCB_set(
         cb.get(),
         [](int a, int b, BN_GENCB* ctx) mutable -> int {
-          PrimeCheckCallback& ptr = *static_cast<PrimeCheckCallback*>(ctx->arg);
-          // Newer versions of openssl and boringssl define the BN_GENCB_get_arg
-          // API which is what is supposed to be used here. Older versions,
-          // however, omit that API.
-          // *static_cast<PrimeCheckCallback*>(BN_GENCB_get_arg(ctx));
+          // BN_GENCB is opaque in OpenSSL 3.x, must use accessor
+          PrimeCheckCallback& ptr =
+              *static_cast<PrimeCheckCallback*>(BN_GENCB_get_arg(ctx));
           return ptr(a, b) ? 1 : 0;
         },
         &innerCb);
