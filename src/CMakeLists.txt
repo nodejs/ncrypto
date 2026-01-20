@@ -1,4 +1,4 @@
-add_library(ncrypto ncrypto.cpp engine.cpp)
+add_library(ncrypto ncrypto.cpp engine.cpp aead.cpp)
 target_link_libraries(ncrypto PUBLIC ssl crypto)
 
 if (NCRYPTO_BSSL_LIBDECREPIT_MISSING)
