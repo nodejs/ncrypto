@@ -1,4 +1,4 @@
-add_library(ncrypto ncrypto.cpp engine.cpp)
+add_library(ncrypto ncrypto.cpp engine.cpp aead.cpp)
 if (NCRYPTO_SHARED_LIBS)
     target_link_libraries(ncrypto PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 else()

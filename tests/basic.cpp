@@ -1,3 +1,4 @@
+#include <aead.h>
 #include <ncrypto.h>
 
 #include <gtest/gtest.h>
