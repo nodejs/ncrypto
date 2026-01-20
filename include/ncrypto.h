@@ -1760,14 +1760,6 @@ class KEM final {
 
 #endif  // OPENSSL_VERSION_MAJOR >= 3
 
-// ============================================================================
-// Version metadata
-#define NCRYPTO_VERSION "0.0.1"
-
-enum {
-  NCRYPTO_VERSION_MAJOR = 0,
-  NCRYPTO_VERSION_MINOR = 0,
-  NCRYPTO_VERSION_REVISION = 1,
-};
+#include "version.h"
 
 }  // namespace ncrypto
