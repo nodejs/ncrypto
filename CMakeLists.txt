@@ -3,7 +3,6 @@ project(ncrypto VERSION 1.0.1) # x-release-please-version
 
 include(CTest)
 include(GNUInstallDirs)
-include(FetchContent)
 include(cmake/ncrypto-flags.cmake)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -11,29 +10,37 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 endif()
 
-include(cmake/CPM.cmake)
+if (NCRYPTO_SHARED_LIBS)
+  find_package(OpenSSL REQUIRED)
+else()
+  include(FetchContent)
+  include(cmake/CPM.cmake)
 
-CPMAddPackage(
+  CPMAddPackage(
     NAME boringssl
     VERSION 0.20250818.0
     GITHUB_REPOSITORY google/boringssl
     GIT_TAG 0.20250818.0
     OPTIONS "BUILD_SHARED_LIBS OFF" "BUILD_TESTING OFF"
-)
+  )
+endif()
+
 add_subdirectory(src)
 add_library(ncrypto::ncrypto ALIAS ncrypto)
 
-include_directories(${boringssl_SOURCE_DIR}/include)
-
 if (NCRYPTO_TESTING)
-  CPMAddPackage(
+  if (NCRYPTO_SHARED_LIBS)
+    find_package(GTest REQUIRED)
+  else()
+    CPMAddPackage(
       NAME GTest
       GITHUB_REPOSITORY google/googletest
       VERSION 1.15.2
       OPTIONS  "BUILD_GMOCK OFF" "INSTALL_GTEST OFF"
-  )
-  # For Windows: Prevent overriding the parent project's compiler/linker settings
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  endif()
   enable_testing()
   add_subdirectory(tests)
 endif()
@@ -52,4 +59,16 @@ install(
   NAMELINK_COMPONENT ncrypto_development
   ARCHIVE COMPONENT ncrypto_development
   INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+# Generate pkg-config file
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/ncrypto.pc.in
+  ${CMAKE_CURRENT_BINARY_DIR}/ncrypto.pc
+  @ONLY
+)
+
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/ncrypto.pc
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
