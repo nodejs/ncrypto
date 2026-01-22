@@ -38,8 +38,10 @@ TEST(basic, cipher_foreach) {
   // as that depends on openssl vs boringssl, versions, configuration, etc.
   // Instead, we look for a couple of very common ciphers that should always be
   // present.
-  ASSERT_TRUE(foundCiphers.count("AES-128-CTR"));
-  ASSERT_TRUE(foundCiphers.count("AES-256-CBC"));
+  ASSERT_TRUE(foundCiphers.count("aes-128-ctr") ||
+              foundCiphers.count("AES-128-CTR"));
+  ASSERT_TRUE(foundCiphers.count("aes-256-cbc") ||
+              foundCiphers.count("AES-256-CBC"));
 }
 
 #ifdef OPENSSL_IS_BORINGSSL
