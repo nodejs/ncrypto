@@ -3,7 +3,7 @@
 #include "ncrypto.h"
 
 #ifdef OPENSSL_IS_BORINGSSL
-#include "aead.h"
+#include "ncrypto/aead.h"
 
 namespace ncrypto {
 
