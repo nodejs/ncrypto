@@ -1760,6 +1760,6 @@ class KEM final {
 
 #endif  // OPENSSL_VERSION_MAJOR >= 3
 
-#include "version.h"
+#include "ncrypto/version.h"
 
 }  // namespace ncrypto

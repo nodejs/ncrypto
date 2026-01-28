@@ -50,6 +50,11 @@ install(
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   COMPONENT ncrypto_development
 )
+install(
+  DIRECTORY include/ncrypto
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  COMPONENT ncrypto_development
+)
 
 install(
   TARGETS ncrypto
