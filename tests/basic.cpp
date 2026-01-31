@@ -1,5 +1,5 @@
-#include <aead.h>
 #include <ncrypto.h>
+#include <ncrypto/aead.h>
 
 #include <gtest/gtest.h>
 #include <string>

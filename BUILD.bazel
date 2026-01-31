@@ -16,7 +16,7 @@ config_setting(
 cc_library(
     name = "ncrypto",
     srcs = glob(["src/*.cpp"]),
-    hdrs = glob(["include/*.h"]),
+    hdrs = glob(["include/*.h", "include/ncrypto/*.h"]),
     includes = ["include"],
     local_defines = {
         "NCRYPTO_BSSL_LIBDECREPIT_MISSING": select(
