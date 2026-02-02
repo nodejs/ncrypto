@@ -534,3 +534,287 @@ TEST(basic, aead_info) {
   ASSERT_EQ(aead.getMaxTagLength(), 16);
 }
 #endif
+
+// ============================================================================
+// Argon2 KDF tests (OpenSSL 3.2.0+ only)
+
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+#ifndef OPENSSL_NO_ARGON2
+
+TEST(KDF, argon2i) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01,
+                                0x02,
+                                0x03,
+                                0x04,
+                                0x05,
+                                0x06,
+                                0x07,
+                                0x08,
+                                0x09,
+                                0x0a,
+                                0x0b,
+                                0x0c,
+                                0x0d,
+                                0x0e,
+                                0x0f,
+                                0x10};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> secret{nullptr, 0};
+  Buffer<const unsigned char> ad{nullptr, 0};
+
+  // Use small parameters for testing
+  // lanes=1, memcost=16 (KB), iter=3, version=0x13 (1.3)
+  auto result = argon2(passBuf,
+                       saltBuf,
+                       1,
+                       length,
+                       16,
+                       3,
+                       0x13,
+                       secret,
+                       ad,
+                       Argon2Type::ARGON2I);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+
+  // Verify output is not all zeros
+  bool allZeros = true;
+  for (size_t i = 0; i < length; i++) {
+    if (reinterpret_cast<unsigned char*>(result.get())[i] != 0) {
+      allZeros = false;
+      break;
+    }
+  }
+  ASSERT_FALSE(allZeros);
+}
+
+TEST(KDF, argon2d) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01,
+                                0x02,
+                                0x03,
+                                0x04,
+                                0x05,
+                                0x06,
+                                0x07,
+                                0x08,
+                                0x09,
+                                0x0a,
+                                0x0b,
+                                0x0c,
+                                0x0d,
+                                0x0e,
+                                0x0f,
+                                0x10};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> secret{nullptr, 0};
+  Buffer<const unsigned char> ad{nullptr, 0};
+
+  auto result = argon2(passBuf,
+                       saltBuf,
+                       1,
+                       length,
+                       16,
+                       3,
+                       0x13,
+                       secret,
+                       ad,
+                       Argon2Type::ARGON2D);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+TEST(KDF, argon2id) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01,
+                                0x02,
+                                0x03,
+                                0x04,
+                                0x05,
+                                0x06,
+                                0x07,
+                                0x08,
+                                0x09,
+                                0x0a,
+                                0x0b,
+                                0x0c,
+                                0x0d,
+                                0x0e,
+                                0x0f,
+                                0x10};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> secret{nullptr, 0};
+  Buffer<const unsigned char> ad{nullptr, 0};
+
+  auto result = argon2(passBuf,
+                       saltBuf,
+                       1,
+                       length,
+                       16,
+                       3,
+                       0x13,
+                       secret,
+                       ad,
+                       Argon2Type::ARGON2ID);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+TEST(KDF, argon2_with_secret_and_ad) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01,
+                                0x02,
+                                0x03,
+                                0x04,
+                                0x05,
+                                0x06,
+                                0x07,
+                                0x08,
+                                0x09,
+                                0x0a,
+                                0x0b,
+                                0x0c,
+                                0x0d,
+                                0x0e,
+                                0x0f,
+                                0x10};
+  const unsigned char secretData[] = {0xaa, 0xbb, 0xcc, 0xdd};
+  const unsigned char adData[] = {0x11, 0x22, 0x33, 0x44, 0x55};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> secret{secretData, sizeof(secretData)};
+  Buffer<const unsigned char> ad{adData, sizeof(adData)};
+
+  auto result = argon2(passBuf,
+                       saltBuf,
+                       1,
+                       length,
+                       16,
+                       3,
+                       0x13,
+                       secret,
+                       ad,
+                       Argon2Type::ARGON2ID);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+TEST(KDF, argon2_empty_password) {
+  const unsigned char salt[] = {0x01,
+                                0x02,
+                                0x03,
+                                0x04,
+                                0x05,
+                                0x06,
+                                0x07,
+                                0x08,
+                                0x09,
+                                0x0a,
+                                0x0b,
+                                0x0c,
+                                0x0d,
+                                0x0e,
+                                0x0f,
+                                0x10};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{"", 0};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> secret{nullptr, 0};
+  Buffer<const unsigned char> ad{nullptr, 0};
+
+  // Empty password should still work
+  auto result = argon2(passBuf,
+                       saltBuf,
+                       1,
+                       length,
+                       16,
+                       3,
+                       0x13,
+                       secret,
+                       ad,
+                       Argon2Type::ARGON2ID);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+TEST(KDF, argon2_different_types_produce_different_output) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01,
+                                0x02,
+                                0x03,
+                                0x04,
+                                0x05,
+                                0x06,
+                                0x07,
+                                0x08,
+                                0x09,
+                                0x0a,
+                                0x0b,
+                                0x0c,
+                                0x0d,
+                                0x0e,
+                                0x0f,
+                                0x10};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> secret{nullptr, 0};
+  Buffer<const unsigned char> ad{nullptr, 0};
+
+  auto resultI = argon2(passBuf,
+                        saltBuf,
+                        1,
+                        length,
+                        16,
+                        3,
+                        0x13,
+                        secret,
+                        ad,
+                        Argon2Type::ARGON2I);
+  auto resultD = argon2(passBuf,
+                        saltBuf,
+                        1,
+                        length,
+                        16,
+                        3,
+                        0x13,
+                        secret,
+                        ad,
+                        Argon2Type::ARGON2D);
+  auto resultID = argon2(passBuf,
+                         saltBuf,
+                         1,
+                         length,
+                         16,
+                         3,
+                         0x13,
+                         secret,
+                         ad,
+                         Argon2Type::ARGON2ID);
+
+  ASSERT_TRUE(resultI);
+  ASSERT_TRUE(resultD);
+  ASSERT_TRUE(resultID);
+
+  // All three types should produce different outputs
+  ASSERT_NE(memcmp(resultI.get(), resultD.get(), length), 0);
+  ASSERT_NE(memcmp(resultI.get(), resultID.get(), length), 0);
+  ASSERT_NE(memcmp(resultD.get(), resultID.get(), length), 0);
+}
+
+#endif  // OPENSSL_NO_ARGON2
+#endif  // OPENSSL_VERSION_NUMBER >= 0x30200000L

@@ -15,6 +15,13 @@
 #include <openssl/hkdf.h>
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+#include <openssl/thread.h>
+#ifndef OPENSSL_NO_ARGON2
+#include <vector>
+#endif
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -23,9 +30,6 @@
 #include <openssl/core_names.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
-#if OPENSSL_VERSION_NUMBER >= 0x30200000L
-#include <openssl/thread.h>
-#endif
 #endif
 #if OPENSSL_WITH_PQC
 struct PQCMapping {

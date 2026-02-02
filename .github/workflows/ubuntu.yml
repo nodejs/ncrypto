@@ -44,3 +44,85 @@ jobs:
         run: cmake --build build -j=4
       - name: Test
         run: ctest --output-on-failure --test-dir build
+
+  # Test with OpenSSL 3.2+ to cover Argon2 code path
+  openssl:
+    runs-on: ubuntu-latest
+    env:
+      OPENSSL_VERSION: "3.4.1"
+      OPENSSL_DIR: "${{ github.workspace }}/openssl-install"
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - name: Cache OpenSSL
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.OPENSSL_DIR }}
+          key: openssl-${{ env.OPENSSL_VERSION }}-${{ runner.os }}
+      - name: Build OpenSSL
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          curl -LO https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz
+          tar xzf openssl-${OPENSSL_VERSION}.tar.gz
+          cd openssl-${OPENSSL_VERSION}
+          ./Configure --prefix=${OPENSSL_DIR} --openssldir=${OPENSSL_DIR}/ssl
+          make -j$(nproc)
+          make install_sw
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{github.job}}-openssl
+      - name: Setup dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgtest-dev
+      - name: Prepare
+        run: |
+          cmake -DNCRYPTO_SHARED_LIBS=ON -G Ninja -B build \
+            -DOPENSSL_ROOT_DIR=${OPENSSL_DIR} \
+            -DCMAKE_PREFIX_PATH=${OPENSSL_DIR}
+      - name: Build
+        run: cmake --build build -j=4
+      - name: Test
+        run: ctest --output-on-failure --test-dir build
+        env:
+          LD_LIBRARY_PATH: ${{ env.OPENSSL_DIR }}/lib64:${{ env.OPENSSL_DIR }}/lib
+
+  # Test with OPENSSL_NO_ARGON2 defined (Argon2 tests excluded)
+  openssl-no-argon2:
+    runs-on: ubuntu-latest
+    env:
+      OPENSSL_VERSION: "3.4.1"
+      OPENSSL_DIR: "${{ github.workspace }}/openssl-install"
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - name: Cache OpenSSL
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.OPENSSL_DIR }}
+          key: openssl-${{ env.OPENSSL_VERSION }}-${{ runner.os }}
+      - name: Build OpenSSL
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          curl -LO https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz
+          tar xzf openssl-${OPENSSL_VERSION}.tar.gz
+          cd openssl-${OPENSSL_VERSION}
+          ./Configure --prefix=${OPENSSL_DIR} --openssldir=${OPENSSL_DIR}/ssl
+          make -j$(nproc)
+          make install_sw
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{github.job}}-openssl-no-argon2
+      - name: Setup dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgtest-dev
+      - name: Prepare
+        run: |
+          cmake -DNCRYPTO_SHARED_LIBS=ON -DCMAKE_CXX_FLAGS="-DOPENSSL_NO_ARGON2" -G Ninja -B build \
+            -DOPENSSL_ROOT_DIR=${OPENSSL_DIR} \
+            -DCMAKE_PREFIX_PATH=${OPENSSL_DIR}
+      - name: Build
+        run: cmake --build build -j=4
+      - name: Test
+        run: ctest --output-on-failure --test-dir build
+        env:
+          LD_LIBRARY_PATH: ${{ env.OPENSSL_DIR }}/lib64:${{ env.OPENSSL_DIR }}/lib
