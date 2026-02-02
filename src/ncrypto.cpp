@@ -10,7 +10,8 @@
 
 #ifndef NCRYPTO_NO_KDF_H
 #include <openssl/kdf.h>
-#else
+#endif
+#ifdef OPENSSL_IS_BORINGSSL
 #include <openssl/hkdf.h>
 #endif
 
@@ -686,6 +687,22 @@ Buffer<char> ExportChallenge(const char* input, size_t length) {
     };
   }
 
+  return {};
+}
+
+bool VerifySpkac(const Buffer<const char>& input) {
+  return VerifySpkac(input.data, input.len);
+}
+
+BIOPointer ExportPublicKey(const Buffer<const char>& input) {
+  return ExportPublicKey(input.data, input.len);
+}
+
+DataPointer ExportChallenge(const Buffer<const char>& input) {
+  auto buf = ExportChallenge(input.data, input.len);
+  if (buf.data != nullptr) {
+    return DataPointer(buf.data, buf.len);
+  }
   return {};
 }
 
@@ -1800,26 +1817,17 @@ bool checkHkdfLength(const Digest& md, size_t length) {
   return true;
 }
 
-DataPointer hkdf(const Digest& md,
-                 const Buffer<const unsigned char>& key,
-                 const Buffer<const unsigned char>& info,
-                 const Buffer<const unsigned char>& salt,
-                 size_t length) {
+bool hkdfInfo(const Digest& md,
+              const Buffer<const unsigned char>& key,
+              const Buffer<const unsigned char>& info,
+              const Buffer<const unsigned char>& salt,
+              size_t length,
+              Buffer<unsigned char>* out) {
   ClearErrorOnReturn clearErrorOnReturn;
 
   if (!checkHkdfLength(md, length) || info.len > INT_MAX ||
       salt.len > INT_MAX) {
-    return {};
-  }
-
-  auto ctx = EVPKeyCtxPointer::NewFromID(EVP_PKEY_HKDF);
-  // OpenSSL < 3.0.0 accepted only a void* as the argument of
-  // EVP_PKEY_CTX_set_hkdf_md.
-  const EVP_MD* md_ptr = md;
-  if (!ctx || !EVP_PKEY_derive_init(ctx.get()) ||
-      !EVP_PKEY_CTX_set_hkdf_md(ctx.get(), md_ptr) ||
-      !EVP_PKEY_CTX_add1_hkdf_info(ctx.get(), info.data, info.len)) {
-    return {};
+    return false;
   }
 
   std::string_view actual_salt;
@@ -1828,6 +1836,28 @@ DataPointer hkdf(const Digest& md,
     actual_salt = {reinterpret_cast<const char*>(salt.data), salt.len};
   } else {
     actual_salt = {default_salt, static_cast<unsigned>(md.size())};
+  }
+
+#ifdef OPENSSL_IS_BORINGSSL
+  if (out == nullptr || out->len != length) return false;
+  return HKDF(out->data,
+              length,
+              md,
+              key.data,
+              key.len,
+              reinterpret_cast<const unsigned char*>(actual_salt.data()),
+              actual_salt.size(),
+              info.data,
+              info.len) == 1;
+#else
+  auto ctx = EVPKeyCtxPointer::NewFromID(EVP_PKEY_HKDF);
+  // OpenSSL < 3.0.0 accepted only a void* as the argument of
+  // EVP_PKEY_CTX_set_hkdf_md.
+  const EVP_MD* md_ptr = md;
+  if (!ctx || !EVP_PKEY_derive_init(ctx.get()) ||
+      !EVP_PKEY_CTX_set_hkdf_md(ctx.get(), md_ptr) ||
+      !EVP_PKEY_CTX_add1_hkdf_info(ctx.get(), info.data, info.len)) {
+    return false;
   }
 
   // We do not use EVP_PKEY_HKDF_MODE_EXTRACT_AND_EXPAND because and instead
@@ -1846,28 +1876,66 @@ DataPointer hkdf(const Digest& md,
            key.len,
            pseudorandom_key,
            &pseudorandom_key_len) == nullptr) {
-    return {};
+    return false;
   }
   if (!EVP_PKEY_CTX_hkdf_mode(ctx.get(), EVP_PKEY_HKDEF_MODE_EXPAND_ONLY) ||
       !EVP_PKEY_CTX_set1_hkdf_key(
           ctx.get(), pseudorandom_key, pseudorandom_key_len)) {
-    return {};
+    return false;
   }
 
+  if (out == nullptr || out->len != length) return false;
+
+  return EVP_PKEY_derive(ctx.get(), out->data, &length) > 0;
+#endif
+}
+
+DataPointer hkdf(const Digest& md,
+                 const Buffer<const unsigned char>& key,
+                 const Buffer<const unsigned char>& info,
+                 const Buffer<const unsigned char>& salt,
+                 size_t length) {
   auto buf = DataPointer::Alloc(length);
   if (!buf) return {};
-
-  if (EVP_PKEY_derive(
-          ctx.get(), static_cast<unsigned char*>(buf.get()), &length) <= 0) {
-    return {};
+  Buffer<unsigned char> out{
+      .data = static_cast<unsigned char*>(buf.get()),
+      .len = length,
+  };
+  if (hkdfInfo(md, key, info, salt, length, &out)) {
+    return buf;
   }
-
-  return buf;
+  return {};
 }
 
 bool checkScryptParams(uint64_t N, uint64_t r, uint64_t p, uint64_t maxmem) {
   return EVP_PBE_scrypt(nullptr, 0, nullptr, 0, N, r, p, maxmem, nullptr, 0) ==
          1;
+}
+
+bool scryptInto(const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt,
+                uint64_t N,
+                uint64_t r,
+                uint64_t p,
+                uint64_t maxmem,
+                size_t length,
+                Buffer<unsigned char>* out) {
+  ClearErrorOnReturn clearErrorOnReturn;
+
+  if (pass.len > INT_MAX || salt.len > INT_MAX || out == nullptr) {
+    return false;
+  }
+
+  return EVP_PBE_scrypt(pass.data,
+                        pass.len,
+                        salt.data,
+                        salt.len,
+                        N,
+                        r,
+                        p,
+                        maxmem,
+                        out->data,
+                        length) == 1;
 }
 
 DataPointer scrypt(const Buffer<const char>& pass,
@@ -1898,6 +1966,30 @@ DataPointer scrypt(const Buffer<const char>& pass,
   }
 
   return {};
+}
+
+bool pbkdf2Into(const Digest& md,
+                const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt,
+                uint32_t iterations,
+                size_t length,
+                Buffer<unsigned char>* out) {
+  ClearErrorOnReturn clearErrorOnReturn;
+
+  if (pass.len > INT_MAX || salt.len > INT_MAX || length > INT_MAX ||
+      out == nullptr) {
+    return false;
+  }
+
+  const EVP_MD* md_ptr = md;
+  return PKCS5_PBKDF2_HMAC(pass.data,
+                           pass.len,
+                           salt.data,
+                           salt.len,
+                           iterations,
+                           md_ptr,
+                           length,
+                           out->data) == 1;
 }
 
 DataPointer pbkdf2(const Digest& md,
@@ -2788,6 +2880,21 @@ EVPKeyPointer::operator Dsa() const {
   OSSL3_CONST DSA* dsa = EVP_PKEY_get0_DSA(get());
   if (dsa == nullptr) return {};
   return Dsa(dsa);
+}
+
+EVPKeyPointer::operator Ec() const {
+  int type = id();
+  if (type != EVP_PKEY_EC) return {};
+
+  OSSL3_CONST EC_KEY* ec = EVP_PKEY_get0_EC_KEY(get());
+  if (ec == nullptr) return {};
+  return Ec(ec);
+}
+
+EVPKeyPointer EVPKeyPointer::clone() const {
+  if (!pkey_) return {};
+  if (!EVP_PKEY_up_ref(pkey_.get())) return {};
+  return EVPKeyPointer(pkey_.get());
 }
 
 bool EVPKeyPointer::validateDsaParameters() const {
@@ -4212,7 +4319,14 @@ void Cipher::ForEach(Cipher::CipherNameCallback callback) {
 
 Ec::Ec() : ec_(nullptr) {}
 
-Ec::Ec(OSSL3_CONST EC_KEY* key) : ec_(key) {}
+Ec::Ec(OSSL3_CONST EC_KEY* key)
+    : ec_(key), x_(BignumPointer::New()), y_(BignumPointer::New()) {
+  if (ec_ != nullptr) {
+    MarkPopErrorOnReturn mark_pop_error_on_return;
+    EC_POINT_get_affine_coordinates(
+        getGroup(), getPublicKey(), x_.get(), y_.get(), nullptr);
+  }
+}
 
 const EC_GROUP* Ec::getGroup() const {
   return ECKeyPointer::GetGroup(ec_);
@@ -4220,6 +4334,22 @@ const EC_GROUP* Ec::getGroup() const {
 
 int Ec::getCurve() const {
   return EC_GROUP_get_curve_name(getGroup());
+}
+
+uint32_t Ec::getDegree() const {
+  return EC_GROUP_get_degree(getGroup());
+}
+
+std::string Ec::getCurveName() const {
+  return std::string(OBJ_nid2sn(getCurve()));
+}
+
+const EC_POINT* Ec::getPublicKey() const {
+  return EC_KEY_get0_public_key(ec_);
+}
+
+const BIGNUM* Ec::getPrivateKey() const {
+  return EC_KEY_get0_private_key(ec_);
 }
 
 int Ec::GetCurveIdFromName(const char* name) {
