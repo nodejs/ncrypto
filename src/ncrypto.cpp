@@ -351,6 +351,11 @@ size_t BignumPointer::byteLength() const {
   return BN_num_bytes(bn_.get());
 }
 
+size_t BignumPointer::bitLength() const {
+  if (bn_ == nullptr) return 0;
+  return BN_num_bits(bn_.get());
+}
+
 DataPointer BignumPointer::encode() const {
   return EncodePadded(bn_.get(), byteLength());
 }
