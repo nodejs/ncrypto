@@ -44,6 +44,84 @@ TEST(basic, cipher_foreach) {
               foundCiphers.count("AES-256-CBC"));
 }
 
+TEST(BignumPointer, bitLength) {
+  // Test empty/null BignumPointer
+  BignumPointer empty;
+  ASSERT_EQ(empty.bitLength(), 0);
+
+  // Test zero value
+  auto zero = BignumPointer::New();
+  ASSERT_TRUE(zero);
+  ASSERT_TRUE(zero.setWord(0));
+  ASSERT_EQ(zero.bitLength(), 0);
+
+  // Test value 1 (1 bit)
+  auto one = BignumPointer::New();
+  ASSERT_TRUE(one);
+  ASSERT_TRUE(one.setWord(1));
+  ASSERT_EQ(one.bitLength(), 1);
+
+  // Test value 2 (2 bits: 10 in binary)
+  auto two = BignumPointer::New();
+  ASSERT_TRUE(two);
+  ASSERT_TRUE(two.setWord(2));
+  ASSERT_EQ(two.bitLength(), 2);
+
+  // Test value 255 (8 bits: 11111111 in binary)
+  auto byte = BignumPointer::New();
+  ASSERT_TRUE(byte);
+  ASSERT_TRUE(byte.setWord(255));
+  ASSERT_EQ(byte.bitLength(), 8);
+
+  // Test value 256 (9 bits: 100000000 in binary)
+  auto nineBits = BignumPointer::New();
+  ASSERT_TRUE(nineBits);
+  ASSERT_TRUE(nineBits.setWord(256));
+  ASSERT_EQ(nineBits.bitLength(), 9);
+
+  // Test larger value (0xFFFFFFFF = 32 bits)
+  auto thirtyTwoBits = BignumPointer::New();
+  ASSERT_TRUE(thirtyTwoBits);
+  ASSERT_TRUE(thirtyTwoBits.setWord(0xFFFFFFFF));
+  ASSERT_EQ(thirtyTwoBits.bitLength(), 32);
+}
+
+TEST(BignumPointer, byteLength) {
+  // Test empty/null BignumPointer
+  BignumPointer empty;
+  ASSERT_EQ(empty.byteLength(), 0);
+
+  // Test zero value
+  auto zero = BignumPointer::New();
+  ASSERT_TRUE(zero);
+  ASSERT_TRUE(zero.setWord(0));
+  ASSERT_EQ(zero.byteLength(), 0);
+
+  // Test value 1 (1 byte)
+  auto one = BignumPointer::New();
+  ASSERT_TRUE(one);
+  ASSERT_TRUE(one.setWord(1));
+  ASSERT_EQ(one.byteLength(), 1);
+
+  // Test value 255 (1 byte)
+  auto byte = BignumPointer::New();
+  ASSERT_TRUE(byte);
+  ASSERT_TRUE(byte.setWord(255));
+  ASSERT_EQ(byte.byteLength(), 1);
+
+  // Test value 256 (2 bytes)
+  auto twoBytes = BignumPointer::New();
+  ASSERT_TRUE(twoBytes);
+  ASSERT_TRUE(twoBytes.setWord(256));
+  ASSERT_EQ(twoBytes.byteLength(), 2);
+
+  // Test larger value (0xFFFFFFFF = 4 bytes)
+  auto fourBytes = BignumPointer::New();
+  ASSERT_TRUE(fourBytes);
+  ASSERT_TRUE(fourBytes.setWord(0xFFFFFFFF));
+  ASSERT_EQ(fourBytes.byteLength(), 4);
+}
+
 #ifdef OPENSSL_IS_BORINGSSL
 TEST(basic, chacha20_poly1305) {
   unsigned char key[] = {0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x02, 0x03,
