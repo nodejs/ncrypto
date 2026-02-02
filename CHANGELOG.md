@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/nodejs/ncrypto/compare/v1.1.0...v1.1.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* re-add more functions that are moved ([2ceab38](https://github.com/nodejs/ncrypto/commit/2ceab38e9caafd49b2f0a722ad76ae68f68fe7b5))
+* re-add removed BignumPointer::bitLength() ([0ba85e3](https://github.com/nodejs/ncrypto/commit/0ba85e3c3a3cdd8abcab066b046bbb11c9136bc8))
+
 ## [1.1.0](https://github.com/nodejs/ncrypto/compare/1.0.1...v1.1.0) (2026-01-31)
 
 
