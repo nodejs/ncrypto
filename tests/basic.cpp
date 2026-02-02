@@ -215,6 +215,42 @@ TEST(Ec, getCurve) {
   ASSERT_EQ(curve, NID_X9_62_prime256v1);
 }
 
+TEST(Ec, GetCurves) {
+  std::vector<std::string> curves;
+
+  bool result = Ec::GetCurves([&](const char* name) {
+    curves.push_back(name);
+    return true;
+  });
+
+  ASSERT_TRUE(result);
+  // Should have at least some built-in curves
+  ASSERT_GT(curves.size(), 0u);
+
+  // Check that common curves are present
+  bool hasP256 = false;
+  bool hasP384 = false;
+  for (const auto& curve : curves) {
+    if (curve == "prime256v1" || curve == "P-256") hasP256 = true;
+    if (curve == "secp384r1" || curve == "P-384") hasP384 = true;
+  }
+  ASSERT_TRUE(hasP256);
+  ASSERT_TRUE(hasP384);
+}
+
+TEST(Ec, GetCurves_early_exit) {
+  int count = 0;
+
+  // Test that returning false stops iteration
+  bool result = Ec::GetCurves([&](const char* name) {
+    count++;
+    return count < 3;  // Stop after 2 curves
+  });
+
+  ASSERT_FALSE(result);
+  ASSERT_EQ(count, 3);
+}
+
 // ============================================================================
 // EVPKeyPointer tests
 
