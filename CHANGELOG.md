@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/nodejs/ncrypto/compare/v1.1.1...v1.1.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* handle edge cases and CI builds ([57cae0f](https://github.com/nodejs/ncrypto/commit/57cae0f055ba7c2d060f0ed4e49431e9e56a0a2d))
+
 ## [1.1.1](https://github.com/nodejs/ncrypto/compare/v1.1.0...v1.1.1) (2026-02-02)
 
 
