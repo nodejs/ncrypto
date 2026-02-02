@@ -514,6 +514,79 @@ class Rsa final {
   OSSL3_CONST RSA* rsa_;
 };
 
+class BignumPointer final {
+ public:
+  BignumPointer() = default;
+  explicit BignumPointer(BIGNUM* bignum);
+  explicit BignumPointer(const unsigned char* data, size_t len);
+  BignumPointer(BignumPointer&& other) noexcept;
+  BignumPointer& operator=(BignumPointer&& other) noexcept;
+  NCRYPTO_DISALLOW_COPY(BignumPointer)
+  ~BignumPointer();
+
+  int operator<=>(const BignumPointer& other) const noexcept;
+  int operator<=>(const BIGNUM* other) const noexcept;
+  inline operator bool() const { return bn_ != nullptr; }
+  inline BIGNUM* get() const noexcept { return bn_.get(); }
+  void reset(BIGNUM* bn = nullptr);
+  void reset(const unsigned char* data, size_t len);
+  BIGNUM* release();
+
+  bool isZero() const;
+  bool isOne() const;
+
+  bool setWord(unsigned long w);  // NOLINT(runtime/int)
+  unsigned long getWord() const;  // NOLINT(runtime/int)
+
+  size_t byteLength() const;
+  size_t bitLength() const;
+
+  DataPointer toHex() const;
+  DataPointer encode() const;
+  DataPointer encodePadded(size_t size) const;
+  size_t encodeInto(unsigned char* out) const;
+  size_t encodePaddedInto(unsigned char* out, size_t size) const;
+
+  using PrimeCheckCallback = std::function<bool(int, int)>;
+  int isPrime(int checks,
+              PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
+  struct PrimeConfig {
+    int bits;
+    bool safe = false;
+    const BignumPointer& add;
+    const BignumPointer& rem;
+  };
+
+  static BignumPointer NewPrime(
+      const PrimeConfig& params,
+      PrimeCheckCallback cb = defaultPrimeCheckCallback);
+
+  bool generate(const PrimeConfig& params,
+                PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
+
+  static BignumPointer New();
+  static BignumPointer NewSecure();
+  static BignumPointer NewSub(const BignumPointer& a, const BignumPointer& b);
+  static BignumPointer NewLShift(size_t length);
+
+  static DataPointer Encode(const BIGNUM* bn);
+  static DataPointer EncodePadded(const BIGNUM* bn, size_t size);
+  static size_t EncodePaddedInto(const BIGNUM* bn,
+                                 unsigned char* out,
+                                 size_t size);
+  static int GetBitCount(const BIGNUM* bn);
+  static int GetByteCount(const BIGNUM* bn);
+  static unsigned long GetWord(const BIGNUM* bn);  // NOLINT(runtime/int)
+  static const BIGNUM* One();
+
+  BignumPointer clone();
+
+ private:
+  DeleteFnPtr<BIGNUM, BN_clear_free> bn_;
+
+  static bool defaultPrimeCheckCallback(int, int) { return 1; }
+};
+
 class Ec final {
  public:
   Ec();
@@ -522,6 +595,10 @@ class Ec final {
 
   const EC_GROUP* getGroup() const;
   int getCurve() const;
+  uint32_t getDegree() const;
+  std::string getCurveName() const;
+  const EC_POINT* getPublicKey() const;
+  const BIGNUM* getPrivateKey() const;
 
   inline operator bool() const { return ec_ != nullptr; }
   inline operator OSSL3_CONST EC_KEY*() const { return ec_; }
@@ -531,8 +608,16 @@ class Ec final {
   using GetCurveCallback = std::function<bool(const char*)>;
   static bool GetCurves(GetCurveCallback callback);
 
+  inline const BignumPointer& getX() const { return x_; }
+  inline const BignumPointer& getY() const { return y_; }
+  inline const BignumPointer& getD() const { return d_; }
+
  private:
   OSSL3_CONST EC_KEY* ec_ = nullptr;
+  // Affine coordinates for the EC_KEY.
+  BignumPointer x_;
+  BignumPointer y_;
+  BignumPointer d_;
 };
 
 // A managed pointer to a buffer of data. When destroyed the underlying
@@ -661,79 +746,6 @@ class BIOPointer final {
 
  private:
   mutable DeleteFnPtr<BIO, BIO_free_all> bio_;
-};
-
-class BignumPointer final {
- public:
-  BignumPointer() = default;
-  explicit BignumPointer(BIGNUM* bignum);
-  explicit BignumPointer(const unsigned char* data, size_t len);
-  BignumPointer(BignumPointer&& other) noexcept;
-  BignumPointer& operator=(BignumPointer&& other) noexcept;
-  NCRYPTO_DISALLOW_COPY(BignumPointer)
-  ~BignumPointer();
-
-  int operator<=>(const BignumPointer& other) const noexcept;
-  int operator<=>(const BIGNUM* other) const noexcept;
-  inline operator bool() const { return bn_ != nullptr; }
-  inline BIGNUM* get() const noexcept { return bn_.get(); }
-  void reset(BIGNUM* bn = nullptr);
-  void reset(const unsigned char* data, size_t len);
-  BIGNUM* release();
-
-  bool isZero() const;
-  bool isOne() const;
-
-  bool setWord(unsigned long w);  // NOLINT(runtime/int)
-  unsigned long getWord() const;  // NOLINT(runtime/int)
-
-  size_t byteLength() const;
-  size_t bitLength() const;
-
-  DataPointer toHex() const;
-  DataPointer encode() const;
-  DataPointer encodePadded(size_t size) const;
-  size_t encodeInto(unsigned char* out) const;
-  size_t encodePaddedInto(unsigned char* out, size_t size) const;
-
-  using PrimeCheckCallback = std::function<bool(int, int)>;
-  int isPrime(int checks,
-              PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
-  struct PrimeConfig {
-    int bits;
-    bool safe = false;
-    const BignumPointer& add;
-    const BignumPointer& rem;
-  };
-
-  static BignumPointer NewPrime(
-      const PrimeConfig& params,
-      PrimeCheckCallback cb = defaultPrimeCheckCallback);
-
-  bool generate(const PrimeConfig& params,
-                PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
-
-  static BignumPointer New();
-  static BignumPointer NewSecure();
-  static BignumPointer NewSub(const BignumPointer& a, const BignumPointer& b);
-  static BignumPointer NewLShift(size_t length);
-
-  static DataPointer Encode(const BIGNUM* bn);
-  static DataPointer EncodePadded(const BIGNUM* bn, size_t size);
-  static size_t EncodePaddedInto(const BIGNUM* bn,
-                                 unsigned char* out,
-                                 size_t size);
-  static int GetBitCount(const BIGNUM* bn);
-  static int GetByteCount(const BIGNUM* bn);
-  static unsigned long GetWord(const BIGNUM* bn);  // NOLINT(runtime/int)
-  static const BIGNUM* One();
-
-  BignumPointer clone();
-
- private:
-  DeleteFnPtr<BIGNUM, BN_clear_free> bn_;
-
-  static bool defaultPrimeCheckCallback(int, int) { return 1; }
 };
 
 class CipherCtxPointer final {
@@ -977,11 +989,14 @@ class EVPKeyPointer final {
   int getDefaultSignPadding() const;
   operator Rsa() const;
   operator Dsa() const;
+  operator Ec() const;
 
   bool isRsaVariant() const;
   bool isOneShotVariant() const;
   bool isSigVariant() const;
   bool validateDsaParameters() const;
+
+  EVPKeyPointer clone() const;
 
  private:
   DeleteFnPtr<EVP_PKEY, EVP_PKEY_free> pkey_;
@@ -1617,6 +1632,10 @@ BIOPointer ExportPublicKey(const char* input, size_t length);
 // The caller takes ownership of the returned Buffer<char>
 Buffer<char> ExportChallenge(const char* input, size_t length);
 
+bool VerifySpkac(const Buffer<const char>& buf);
+BIOPointer ExportPublicKey(const Buffer<const char>& buf);
+DataPointer ExportChallenge(const Buffer<const char>& buf);
+
 // ============================================================================
 // KDF
 
@@ -1632,6 +1651,13 @@ bool extractP1363(const Buffer<const unsigned char>& buf,
                   unsigned char* dest,
                   size_t n);
 
+bool hkdfInfo(const Digest& md,
+              const Buffer<const unsigned char>& key,
+              const Buffer<const unsigned char>& info,
+              const Buffer<const unsigned char>& salt,
+              size_t length,
+              Buffer<unsigned char>* out);
+
 DataPointer hkdf(const Digest& md,
                  const Buffer<const unsigned char>& key,
                  const Buffer<const unsigned char>& info,
@@ -1640,6 +1666,15 @@ DataPointer hkdf(const Digest& md,
 
 bool checkScryptParams(uint64_t N, uint64_t r, uint64_t p, uint64_t maxmem);
 
+bool scryptInto(const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt,
+                uint64_t N,
+                uint64_t r,
+                uint64_t p,
+                uint64_t maxmem,
+                size_t length,
+                Buffer<unsigned char>* out);
+
 DataPointer scrypt(const Buffer<const char>& pass,
                    const Buffer<const unsigned char>& salt,
                    uint64_t N,
@@ -1647,6 +1682,13 @@ DataPointer scrypt(const Buffer<const char>& pass,
                    uint64_t p,
                    uint64_t maxmem,
                    size_t length);
+
+bool pbkdf2Into(const Digest& md,
+                const Buffer<const char>& pass,
+                const Buffer<const unsigned char>& salt,
+                uint32_t iterations,
+                size_t length,
+                Buffer<unsigned char>* out);
 
 DataPointer pbkdf2(const Digest& md,
                    const Buffer<const char>& pass,

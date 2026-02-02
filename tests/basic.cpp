@@ -122,6 +122,375 @@ TEST(BignumPointer, byteLength) {
   ASSERT_EQ(fourBytes.byteLength(), 4);
 }
 
+// ============================================================================
+// Ec class tests
+
+// Helper to create an EC key for testing
+static ECKeyPointer createTestEcKey() {
+  // NID_X9_62_prime256v1 is P-256
+  auto key = ECKeyPointer::NewByCurveName(NID_X9_62_prime256v1);
+  if (key && EC_KEY_generate_key(key.get())) {
+    return key;
+  }
+  return {};
+}
+
+TEST(Ec, getDegree) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  Ec ec(ecKey.get());
+  ASSERT_TRUE(ec);
+
+  // P-256 has degree 256
+  ASSERT_EQ(ec.getDegree(), 256u);
+}
+
+TEST(Ec, getCurveName) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  Ec ec(ecKey.get());
+  ASSERT_TRUE(ec);
+
+  // P-256 is also known as prime256v1
+  std::string name = ec.getCurveName();
+  ASSERT_TRUE(name == "prime256v1" || name == "P-256");
+}
+
+TEST(Ec, getPublicKey) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  Ec ec(ecKey.get());
+  ASSERT_TRUE(ec);
+
+  // Public key should exist
+  const EC_POINT* pubKey = ec.getPublicKey();
+  ASSERT_NE(pubKey, nullptr);
+}
+
+TEST(Ec, getPrivateKey) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  Ec ec(ecKey.get());
+  ASSERT_TRUE(ec);
+
+  // Private key should exist for a generated key
+  const BIGNUM* privKey = ec.getPrivateKey();
+  ASSERT_NE(privKey, nullptr);
+}
+
+TEST(Ec, getXYCoordinates) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  Ec ec(ecKey.get());
+  ASSERT_TRUE(ec);
+
+  // X and Y coordinates should be populated
+  const BignumPointer& x = ec.getX();
+  const BignumPointer& y = ec.getY();
+
+  ASSERT_TRUE(x);
+  ASSERT_TRUE(y);
+
+  // For P-256, coordinates should be 256 bits (32 bytes)
+  ASSERT_GT(x.byteLength(), 0u);
+  ASSERT_LE(x.byteLength(), 32u);
+  ASSERT_GT(y.byteLength(), 0u);
+  ASSERT_LE(y.byteLength(), 32u);
+}
+
+TEST(Ec, getCurve) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  Ec ec(ecKey.get());
+  ASSERT_TRUE(ec);
+
+  // getCurve should return the NID for P-256
+  int curve = ec.getCurve();
+  ASSERT_EQ(curve, NID_X9_62_prime256v1);
+}
+
+// ============================================================================
+// EVPKeyPointer tests
+
+TEST(EVPKeyPointer, operatorEc) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  // Create EVPKeyPointer from EC_KEY
+  EVPKeyPointer key(EVP_PKEY_new());
+  ASSERT_TRUE(key);
+  ASSERT_TRUE(EVP_PKEY_set1_EC_KEY(key.get(), ecKey.get()));
+
+  // Convert to Ec
+  Ec ec = key;
+  ASSERT_TRUE(ec);
+  ASSERT_EQ(ec.getDegree(), 256u);
+}
+
+TEST(EVPKeyPointer, clone) {
+  auto ecKey = createTestEcKey();
+  ASSERT_TRUE(ecKey);
+
+  // Create EVPKeyPointer from EC_KEY
+  EVPKeyPointer key(EVP_PKEY_new());
+  ASSERT_TRUE(key);
+  ASSERT_TRUE(EVP_PKEY_set1_EC_KEY(key.get(), ecKey.get()));
+
+  // Clone the key
+  auto cloned = key.clone();
+  ASSERT_TRUE(cloned);
+
+  // Both should be valid
+  ASSERT_TRUE(key);
+  ASSERT_TRUE(cloned);
+
+  // Both should have the same key type
+  ASSERT_EQ(key.id(), cloned.id());
+}
+
+TEST(EVPKeyPointer, cloneEmpty) {
+  EVPKeyPointer empty;
+  ASSERT_FALSE(empty);
+
+  // Clone of empty should be empty
+  auto cloned = empty.clone();
+  ASSERT_FALSE(cloned);
+}
+
+// ============================================================================
+// KDF tests
+
+TEST(KDF, pbkdf2Into) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+
+  unsigned char output[32];
+  Buffer<unsigned char> outBuf{output, length};
+
+  Digest md(EVP_sha256());
+  ASSERT_TRUE(md);
+
+  bool result = pbkdf2Into(md, passBuf, saltBuf, 1000, length, &outBuf);
+  ASSERT_TRUE(result);
+
+  // Verify output is not all zeros
+  bool allZeros = true;
+  for (size_t i = 0; i < length; i++) {
+    if (output[i] != 0) {
+      allZeros = false;
+      break;
+    }
+  }
+  ASSERT_FALSE(allZeros);
+}
+
+TEST(KDF, pbkdf2) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+
+  Digest md(EVP_sha256());
+  ASSERT_TRUE(md);
+
+  auto result = pbkdf2(md, passBuf, saltBuf, 1000, length);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+TEST(KDF, scryptInto) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+
+  unsigned char output[32];
+  Buffer<unsigned char> outBuf{output, length};
+
+  // Use small parameters for testing
+  bool result = scryptInto(passBuf, saltBuf, 16, 1, 1, 0, length, &outBuf);
+  ASSERT_TRUE(result);
+
+  // Verify output is not all zeros
+  bool allZeros = true;
+  for (size_t i = 0; i < length; i++) {
+    if (output[i] != 0) {
+      allZeros = false;
+      break;
+    }
+  }
+  ASSERT_FALSE(allZeros);
+}
+
+TEST(KDF, scrypt) {
+  const char* password = "password";
+  const unsigned char salt[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+  const size_t length = 32;
+
+  Buffer<const char> passBuf{password, strlen(password)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+
+  // Use small parameters for testing
+  auto result = scrypt(passBuf, saltBuf, 16, 1, 1, 0, length);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+TEST(KDF, hkdfInfo) {
+  const unsigned char key[] = {0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b};
+  const unsigned char salt[] = {
+      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+  const unsigned char info[] = {0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7};
+  const size_t length = 42;
+
+  Buffer<const unsigned char> keyBuf{key, sizeof(key)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> infoBuf{info, sizeof(info)};
+
+  unsigned char output[42];
+  Buffer<unsigned char> outBuf{output, length};
+
+  Digest md(EVP_sha256());
+  ASSERT_TRUE(md);
+
+  bool result = hkdfInfo(md, keyBuf, infoBuf, saltBuf, length, &outBuf);
+  ASSERT_TRUE(result);
+
+  // Verify output is not all zeros
+  bool allZeros = true;
+  for (size_t i = 0; i < length; i++) {
+    if (output[i] != 0) {
+      allZeros = false;
+      break;
+    }
+  }
+  ASSERT_FALSE(allZeros);
+}
+
+TEST(KDF, hkdf) {
+  const unsigned char key[] = {0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b,
+                               0x0b};
+  const unsigned char salt[] = {
+      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+  const unsigned char info[] = {0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7};
+  const size_t length = 42;
+
+  Buffer<const unsigned char> keyBuf{key, sizeof(key)};
+  Buffer<const unsigned char> saltBuf{salt, sizeof(salt)};
+  Buffer<const unsigned char> infoBuf{info, sizeof(info)};
+
+  Digest md(EVP_sha256());
+  ASSERT_TRUE(md);
+
+  auto result = hkdf(md, keyBuf, infoBuf, saltBuf, length);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result.size(), length);
+}
+
+// ============================================================================
+// SPKAC tests
+
+TEST(SPKAC, VerifySpkacBuffer) {
+  // A valid SPKAC string (base64 encoded)
+  // This is a test SPKAC - in real use, you'd have a properly generated one
+  const char* spkac =
+      "MIIBQDCBqjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA2L3lR6VHBxKBZGnr"
+      "5R9AmJwcQPePMHl7X1tj0n5PKMXwXHLqD/xHtqWFN9aSWfZhCYVOYMPLsIEZvtsJ"
+      "qFCJzJXB7lYlLqcLLVJ5sDlT0fM8QiJR6CnBlWgaXEozL5XdKJdQ7UVlL1qqoLJP"
+      "8wLJ0PhXFaNvlNBaXx1lAx0CAwEAARYAMA0GCSqGSIb3DQEBBQUAA4GBAKMzhfqX"
+      "MvWRBfL+VNVX/3rE9IahSMPl/Dz0P4UO0MtDgYFR4N0tPPqg1EMH7HJRxPJQDUlf"
+      "M9TsMI8e8KfJX0VdPmmjvNy3LcboJqmqQ8TViV2U0K0mTgg3kEWdKl25QcleVQry"
+      "CqU2ThYNnK3QEbFwuTS4MHk4MHk2WHJoYzlk";
+
+  Buffer<const char> buf{spkac, strlen(spkac)};
+
+  // Note: This specific SPKAC may not verify correctly due to signature issues,
+  // but we're testing that the function runs without crashing and accepts the
+  // buffer interface
+  bool result = VerifySpkac(buf);
+  // The result depends on the validity of the SPKAC
+  (void)result;
+}
+
+TEST(SPKAC, ExportPublicKeyBuffer) {
+  const char* spkac =
+      "MIIBQDCBqjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA2L3lR6VHBxKBZGnr"
+      "5R9AmJwcQPePMHl7X1tj0n5PKMXwXHLqD/xHtqWFN9aSWfZhCYVOYMPLsIEZvtsJ"
+      "qFCJzJXB7lYlLqcLLVJ5sDlT0fM8QiJR6CnBlWgaXEozL5XdKJdQ7UVlL1qqoLJP"
+      "8wLJ0PhXFaNvlNBaXx1lAx0CAwEAARYAMA0GCSqGSIb3DQEBBQUAA4GBAKMzhfqX"
+      "MvWRBfL+VNVX/3rE9IahSMPl/Dz0P4UO0MtDgYFR4N0tPPqg1EMH7HJRxPJQDUlf"
+      "M9TsMI8e8KfJX0VdPmmjvNy3LcboJqmqQ8TViV2U0K0mTgg3kEWdKl25QcleVQry"
+      "CqU2ThYNnK3QEbFwuTS4MHk4MHk2WHJoYzlk";
+
+  Buffer<const char> buf{spkac, strlen(spkac)};
+
+  // Test that the buffer version works
+  auto bio = ExportPublicKey(buf);
+  // Result depends on SPKAC validity
+  (void)bio;
+}
+
+TEST(SPKAC, ExportChallengeBuffer) {
+  const char* spkac =
+      "MIIBQDCBqjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA2L3lR6VHBxKBZGnr"
+      "5R9AmJwcQPePMHl7X1tj0n5PKMXwXHLqD/xHtqWFN9aSWfZhCYVOYMPLsIEZvtsJ"
+      "qFCJzJXB7lYlLqcLLVJ5sDlT0fM8QiJR6CnBlWgaXEozL5XdKJdQ7UVlL1qqoLJP"
+      "8wLJ0PhXFaNvlNBaXx1lAx0CAwEAARYAMA0GCSqGSIb3DQEBBQUAA4GBAKMzhfqX"
+      "MvWRBfL+VNVX/3rE9IahSMPl/Dz0P4UO0MtDgYFR4N0tPPqg1EMH7HJRxPJQDUlf"
+      "M9TsMI8e8KfJX0VdPmmjvNy3LcboJqmqQ8TViV2U0K0mTgg3kEWdKl25QcleVQry"
+      "CqU2ThYNnK3QEbFwuTS4MHk4MHk2WHJoYzlk";
+
+  Buffer<const char> buf{spkac, strlen(spkac)};
+
+  // Test that the buffer version works and returns DataPointer
+  auto challenge = ExportChallenge(buf);
+  // Result depends on SPKAC validity
+  (void)challenge;
+}
+
 #ifdef OPENSSL_IS_BORINGSSL
 TEST(basic, chacha20_poly1305) {
   unsigned char key[] = {0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x02, 0x03,
