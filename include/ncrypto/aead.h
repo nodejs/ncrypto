@@ -19,7 +19,7 @@ class Aead final {
 
  public:
   Aead() = default;
-  Aead(const AeadInfo* info, const EVP_AEAD* aead) : info_(info), aead_(aead) {}
+  Aead(const AeadInfo* info, const EVP_AEAD* aead) : aead_(aead), info_(info) {}
   Aead(const Aead&) = default;
   Aead& operator=(const Aead&) = default;
   NCRYPTO_DISALLOW_MOVE(Aead)
