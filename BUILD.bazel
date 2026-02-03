@@ -17,6 +17,13 @@ cc_library(
     name = "ncrypto",
     srcs = glob(["src/*.cpp"]),
     hdrs = glob(["include/*.h", "include/ncrypto/*.h"]),
+    copts = [
+        "-Werror",
+        "-Wextra",
+        "-Wno-unused-parameter",
+        "-Wimplicit-fallthrough",
+        "-Wno-deprecated-declarations",  # OpenSSL 3.0 deprecates many APIs we intentionally use
+    ],
     includes = ["include"],
     local_defines = {
         "NCRYPTO_BSSL_LIBDECREPIT_MISSING": select(
