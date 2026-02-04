@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/nodejs/ncrypto/compare/v1.1.2...v1.1.3) (2026-02-04)
+
+
+### Bug Fixes
+
+* unconditionally include vector ([ba39e40](https://github.com/nodejs/ncrypto/commit/ba39e40ed1c1231902a676f53906cdd2f6119648))
+* use more strict compiler flags ([fc401e3](https://github.com/nodejs/ncrypto/commit/fc401e387491005bfbe6c48b7296862d07ea85d7))
+
 ## [1.1.2](https://github.com/nodejs/ncrypto/compare/v1.1.1...v1.1.2) (2026-02-02)
 
 

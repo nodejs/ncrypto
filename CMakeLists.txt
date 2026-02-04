@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(ncrypto VERSION 1.1.2) # x-release-please-version
+project(ncrypto VERSION 1.1.3) # x-release-please-version
 
 include(CTest)
 include(GNUInstallDirs)
