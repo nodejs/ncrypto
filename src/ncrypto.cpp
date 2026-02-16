@@ -3403,19 +3403,19 @@ bool CipherCtxPointer::setKeyLength(size_t length) {
 bool CipherCtxPointer::setIvLength(size_t length) {
   if (!ctx_) return false;
   return EVP_CIPHER_CTX_ctrl(
-      ctx_.get(), EVP_CTRL_AEAD_SET_IVLEN, length, nullptr);
+      ctx_.get(), EVP_CTRL_AEAD_SET_IVLEN, length, nullptr) > 0;
 }
 
 bool CipherCtxPointer::setAeadTag(const Buffer<const char>& tag) {
   if (!ctx_) return false;
   return EVP_CIPHER_CTX_ctrl(
-      ctx_.get(), EVP_CTRL_AEAD_SET_TAG, tag.len, const_cast<char*>(tag.data));
+      ctx_.get(), EVP_CTRL_AEAD_SET_TAG, tag.len, const_cast<char*>(tag.data)) > 0;
 }
 
 bool CipherCtxPointer::setAeadTagLength(size_t length) {
   if (!ctx_) return false;
   return EVP_CIPHER_CTX_ctrl(
-      ctx_.get(), EVP_CTRL_AEAD_SET_TAG, length, nullptr);
+      ctx_.get(), EVP_CTRL_AEAD_SET_TAG, length, nullptr) > 0;
 }
 
 bool CipherCtxPointer::setPadding(bool padding) {
@@ -3485,7 +3485,7 @@ bool CipherCtxPointer::update(const Buffer<const unsigned char>& in,
 
 bool CipherCtxPointer::getAeadTag(size_t len, unsigned char* out) {
   if (!ctx_) return false;
-  return EVP_CIPHER_CTX_ctrl(ctx_.get(), EVP_CTRL_AEAD_GET_TAG, len, out);
+  return EVP_CIPHER_CTX_ctrl(ctx_.get(), EVP_CTRL_AEAD_GET_TAG, len, out) > 0;
 }
 
 // ============================================================================
