@@ -228,7 +228,7 @@ void DataPointer::zero() {
   OPENSSL_cleanse(data_, len_);
 }
 
-void DataPointer::reset(void* data, size_t length) {
+void DataPointer::free() {
   if (data_ != nullptr) {
     if (secure_) {
       OPENSSL_secure_clear_free(data_, len_);
@@ -236,6 +236,10 @@ void DataPointer::reset(void* data, size_t length) {
       OPENSSL_clear_free(data_, len_);
     }
   }
+}
+
+void DataPointer::reset(void* data, size_t length) {
+  free();
   data_ = data;
   len_ = length;
 }
@@ -258,7 +262,12 @@ DataPointer DataPointer::resize(size_t len) {
   size_t actual_len = std::min(len_, len);
   auto buf = release();
   if (actual_len == len_) return DataPointer(buf.data, actual_len);
-  buf.data = OPENSSL_realloc(buf.data, actual_len);
+  auto new_data = OPENSSL_realloc(buf.data, actual_len);
+  if (new_data == nullptr) {
+    free();
+    return {};
+  }
+  buf.data = new_data;
   buf.len = actual_len;
   return DataPointer(buf);
 }

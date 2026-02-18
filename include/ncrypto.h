@@ -690,6 +690,8 @@ class DataPointer final {
   bool isSecure() const { return secure_; }
 
  private:
+  void free();
+
   void* data_ = nullptr;
   size_t len_ = 0;
   bool secure_ = false;
