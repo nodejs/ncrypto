@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/nodejs/ncrypto/compare/v1.1.3...v1.1.4) (2026-03-28)
+
+
+### Bug Fixes
+
+* handle reallocation failure gracefully in DataPointer::resize() ([#37](https://github.com/nodejs/ncrypto/issues/37)) ([944c570](https://github.com/nodejs/ncrypto/commit/944c57099055ccadd2f411b4415db78b9ecac262))
+* use proper return value check for EVP_CIPHER_CTX_ctrl() ([#36](https://github.com/nodejs/ncrypto/issues/36)) ([88555cc](https://github.com/nodejs/ncrypto/commit/88555cc07e8ffcfdbbab779e86cc6225317ee6ae))
+
 ## [1.1.3](https://github.com/nodejs/ncrypto/compare/v1.1.2...v1.1.3) (2026-02-04)
 
 
