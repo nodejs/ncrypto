@@ -3679,8 +3679,40 @@ bool ECKeyPointer::setPublicKey(const ECPointPointer& pub) {
 bool ECKeyPointer::setPublicKeyRaw(const BignumPointer& x,
                                    const BignumPointer& y) {
   if (!key_) return false;
-  return EC_KEY_set_public_key_affine_coordinates(
-             key_.get(), x.get(), y.get()) == 1;
+  const EC_GROUP* group = EC_KEY_get0_group(key_.get());
+  if (group == nullptr) return false;
+
+  // For curves with cofactor h=1, use EC_POINT_oct2point +
+  // EC_KEY_set_public_key instead of
+  // EC_KEY_set_public_key_affine_coordinates.
+  // The latter internally calls EC_KEY_check_key() which performs a scalar
+  // multiplication (n*Q) for order validation — redundant when h=1 since every
+  // on-curve point already has order n. EC_POINT_oct2point validates the point
+  // is on the curve, which is sufficient. For curves with h!=1, fall back to
+  // the full check.
+  auto cofactor = BignumPointer::New();
+  if (!cofactor || !EC_GROUP_get_cofactor(group, cofactor.get(), nullptr) ||
+      !cofactor.isOne()) {
+    return EC_KEY_set_public_key_affine_coordinates(
+               key_.get(), x.get(), y.get()) == 1;
+  }
+
+  // Field element byte length: ceil(degree_bits / 8).
+  size_t field_len = (EC_GROUP_get_degree(group) + 7) / 8;
+
+  // Build an uncompressed point: 0x04 || x || y, each padded to field_len.
+  size_t uncompressed_len = 1 + 2 * field_len;
+  auto buf = DataPointer::Alloc(uncompressed_len);
+  if (!buf) return false;
+  unsigned char* ptr = static_cast<unsigned char*>(buf.get());
+  ptr[0] = POINT_CONVERSION_UNCOMPRESSED;
+  x.encodePaddedInto(ptr + 1, field_len);
+  y.encodePaddedInto(ptr + 1 + field_len, field_len);
+
+  auto point = ECPointPointer::New(group);
+  if (!point) return false;
+  if (!point.setFromBuffer({ptr, uncompressed_len}, group)) return false;
+  return EC_KEY_set_public_key(key_.get(), point.get()) == 1;
 }
 
 bool ECKeyPointer::setPrivateKey(const BignumPointer& priv) {
@@ -3940,6 +3972,23 @@ bool EVPKeyCtxPointer::setSignatureMd(const EVPMDCtxPointer& md) {
   return EVP_PKEY_CTX_set_signature_md(ctx_.get(), EVP_MD_CTX_md(md.get())) ==
          1;
 }
+
+bool EVPKeyCtxPointer::setSignatureMd(const Digest& md) {
+  if (!ctx_ || !md) return false;
+  return EVP_PKEY_CTX_set_signature_md(ctx_.get(), md.get()) == 1;
+}
+
+#if OPENSSL_VERSION_MAJOR >= 3
+int EVPKeyCtxPointer::initForSignEx(const OSSL_PARAM params[]) {
+  if (!ctx_) return 0;
+  return EVP_PKEY_sign_init_ex(ctx_.get(), params);
+}
+
+int EVPKeyCtxPointer::initForVerifyEx(const OSSL_PARAM params[]) {
+  if (!ctx_) return 0;
+  return EVP_PKEY_verify_init_ex(ctx_.get(), params);
+}
+#endif
 
 bool EVPKeyCtxPointer::initForEncrypt() {
   if (!ctx_) return false;
@@ -4502,6 +4551,27 @@ std::optional<EVP_PKEY_CTX*> EVPMDCtxPointer::signInitWithContext(
 #ifdef OSSL_SIGNATURE_PARAM_CONTEXT_STRING
   EVP_PKEY_CTX* ctx = nullptr;
 
+#ifdef OSSL_SIGNATURE_PARAM_INSTANCE
+  // Ed25519ctx requires the INSTANCE param to enable context string support.
+  // Ed25519 pure mode ignores context strings without this.
+  if (key.id() == EVP_PKEY_ED25519) {
+    const OSSL_PARAM params[] = {
+        OSSL_PARAM_construct_utf8_string(
+            OSSL_SIGNATURE_PARAM_INSTANCE, const_cast<char*>("Ed25519ctx"), 0),
+        OSSL_PARAM_construct_octet_string(
+            OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
+            const_cast<unsigned char*>(context_string.data),
+            context_string.len),
+        OSSL_PARAM_END};
+
+    if (!EVP_DigestSignInit_ex(
+            ctx_.get(), &ctx, nullptr, nullptr, nullptr, key.get(), params)) {
+      return std::nullopt;
+    }
+    return ctx;
+  }
+#endif  // OSSL_SIGNATURE_PARAM_INSTANCE
+
   const OSSL_PARAM params[] = {
       OSSL_PARAM_construct_octet_string(
           OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
@@ -4525,6 +4595,27 @@ std::optional<EVP_PKEY_CTX*> EVPMDCtxPointer::verifyInitWithContext(
     const Buffer<const unsigned char>& context_string) {
 #ifdef OSSL_SIGNATURE_PARAM_CONTEXT_STRING
   EVP_PKEY_CTX* ctx = nullptr;
+
+#ifdef OSSL_SIGNATURE_PARAM_INSTANCE
+  // Ed25519ctx requires the INSTANCE param to enable context string support.
+  // Ed25519 pure mode ignores context strings without this.
+  if (key.id() == EVP_PKEY_ED25519) {
+    const OSSL_PARAM params[] = {
+        OSSL_PARAM_construct_utf8_string(
+            OSSL_SIGNATURE_PARAM_INSTANCE, const_cast<char*>("Ed25519ctx"), 0),
+        OSSL_PARAM_construct_octet_string(
+            OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
+            const_cast<unsigned char*>(context_string.data),
+            context_string.len),
+        OSSL_PARAM_END};
+
+    if (!EVP_DigestVerifyInit_ex(
+            ctx_.get(), &ctx, nullptr, nullptr, nullptr, key.get(), params)) {
+      return std::nullopt;
+    }
+    return ctx;
+  }
+#endif  // OSSL_SIGNATURE_PARAM_INSTANCE
 
   const OSSL_PARAM params[] = {
       OSSL_PARAM_construct_octet_string(
