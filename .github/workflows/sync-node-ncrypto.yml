@@ -1,0 +1,109 @@
+name: Sync Node ncrypto
+
+on:
+  workflow_dispatch:
+    inputs:
+      node_ref:
+        description: nodejs/node ref to sync from
+        required: true
+        default: main
+      base_node_ref:
+        description: Optional previous nodejs/node ref for bootstrap or recovery
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync from nodejs/node
+        id: sync
+        env:
+          NODE_REF: ${{ inputs.node_ref }}
+          BASE_NODE_REF: ${{ inputs.base_node_ref }}
+        run: |
+          python3 tools/sync-node-ncrypto.py \
+            --node-ref "$NODE_REF" \
+            --base-node-ref "$BASE_NODE_REF"
+
+      - name: Stop when there are no changes
+        if: steps.sync.outputs.has_changes != 'true'
+        run: echo 'No ncrypto changes to sync.'
+
+      - name: Commit sync branch
+        id: commit
+        if: steps.sync.outputs.has_changes == 'true'
+        run: |
+          branch='${{ steps.sync.outputs.branch_name }}'
+          git switch -c "$branch"
+          git fetch origin "$branch:refs/remotes/origin/$branch" || true
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            .github/sync-node-ncrypto.json \
+            include/ncrypto.h \
+            src/engine.cpp \
+            src/ncrypto.cpp
+          git commit \
+            -m 'chore: sync ncrypto from nodejs/node' \
+            -m 'Node-Base-Commit: ${{ steps.sync.outputs.base_sha }}' \
+            -m 'Node-Target-Commit: ${{ steps.sync.outputs.target_sha }}'
+          git push --force-with-lease origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare PR body
+        if: steps.sync.outputs.has_changes == 'true'
+        run: |
+          {
+            echo 'Syncs `deps/ncrypto` from `nodejs/node` into this repository.'
+            echo
+            echo '- Base node commit: `${{ steps.sync.outputs.base_sha }}`'
+            echo '- Target node commit: `${{ steps.sync.outputs.target_sha }}`'
+            echo '- Conflicts: `${{ steps.sync.outputs.has_conflicts }}`'
+            if [ '${{ steps.sync.outputs.has_conflicts }}' = 'true' ]; then
+              echo
+              echo 'This PR was opened as a draft because the 3-way merge produced conflicts:'
+              echo
+              printf '%s\n' '${{ steps.sync.outputs.conflicts }}' | sed 's/^/- `/' | sed 's/$/`/'
+            fi
+          } > "$RUNNER_TEMP/pr-body.md"
+
+      - name: Open or update PR
+        if: steps.sync.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch='${{ steps.commit.outputs.branch }}'
+          title='chore: sync ncrypto from nodejs/node'
+          existing_url="$(gh pr view "$branch" --json url --jq .url 2>/dev/null || true)"
+          if [ -n "$existing_url" ]; then
+            gh pr edit "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"
+            if [ '${{ steps.sync.outputs.has_conflicts }}' = 'true' ]; then
+              gh pr ready "$branch" --undo || true
+            else
+              gh pr ready "$branch" || true
+            fi
+            echo "$existing_url"
+            exit 0
+          fi
+
+          args=(
+            pr create
+            --base main
+            --head "$branch"
+            --title "$title"
+            --body-file "$RUNNER_TEMP/pr-body.md"
+          )
+          if [ '${{ steps.sync.outputs.has_conflicts }}' = 'true' ]; then
+            args+=(--draft)
+          fi
+          gh "${args[@]}"
