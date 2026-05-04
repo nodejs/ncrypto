@@ -332,12 +332,25 @@ class Cipher final {
 #else
   static constexpr size_t MAX_AUTH_TAG_LENGTH = 16;
 #endif
+<<<<<<< nodejs/ncrypto:include/ncrypto.h
   static_assert(EVP_GCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH
 #ifndef OPENSSL_IS_BORINGSSL
                 && EVP_CCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
                 EVP_CHACHAPOLY_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH
 #endif
   );
+||||||| nodejs/node:deps/ncrypto/ncrypto.h@8385efc01343
+  static_assert(EVP_GCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
+                EVP_CCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
+                EVP_CHACHAPOLY_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH);
+=======
+  static_assert(EVP_GCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH
+#ifndef OPENSSL_IS_BORINGSSL
+                && EVP_CCM_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH &&
+                EVP_CHACHAPOLY_TLS_TAG_LEN <= MAX_AUTH_TAG_LENGTH
+#endif
+  );  // NOLINT(whitespace/parens)
+>>>>>>> nodejs/node:deps/ncrypto/ncrypto.h@25f80fb7647d
 
   Cipher() = default;
   Cipher(const EVP_CIPHER* cipher) : cipher_(cipher) {}
