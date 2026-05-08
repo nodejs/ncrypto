@@ -58,6 +58,53 @@ def fetch_ref(repository: str, ref: str) -> str:
     return git(('rev-parse', 'FETCH_HEAD^{commit}')).stdout.decode().strip()
 
 
+def release_version(tag: str) -> tuple[int, int, int] | None:
+    if tag.startswith('refs/tags/'):
+        tag = tag.removeprefix('refs/tags/')
+    if not tag.startswith('v'):
+        return None
+
+    parts = tag.removeprefix('v').split('.')
+    if len(parts) != 3 or not all(part.isdecimal() for part in parts):
+        return None
+
+    major, minor, patch = parts
+    return (int(major), int(minor), int(patch))
+
+
+def latest_stable_release(repository: str) -> str:
+    output = git(('ls-remote', '--tags', '--refs', repository, 'v*.*.*')).stdout.decode()
+    releases: list[tuple[tuple[int, int, int], str]] = []
+    for line in output.splitlines():
+        try:
+            _, ref = line.split(None, maxsplit=1)
+        except ValueError:
+            continue
+
+        version = release_version(ref)
+        if version is not None:
+            releases.append((version, ref.removeprefix('refs/tags/')))
+
+    if not releases:
+        raise SyncError(f'could not find stable Node.js release tags in {repository}')
+
+    return max(releases)[1]
+
+
+def resolve_target_ref(repository: str, ref: str) -> str:
+    if not ref:
+        return latest_stable_release(repository)
+
+    return ref
+
+
+def target_version(ref: str, sha: str) -> str:
+    if release_version(ref) is not None:
+        return ref.removeprefix('refs/tags/')
+
+    return sha[:12]
+
+
 def load_state(path: Path) -> str | None:
     if not path.exists():
         return None
@@ -180,8 +227,10 @@ def sync(args: argparse.Namespace) -> int:
     if base_ref is None:
         raise SyncError(f'{state_path} does not record a node_commit; pass --base-node-ref to bootstrap the sync')
 
+    target_ref = resolve_target_ref(args.node_repository, args.node_ref)
     base_sha = fetch_ref(args.node_repository, base_ref)
-    target_sha = fetch_ref(args.node_repository, args.node_ref)
+    target_sha = fetch_ref(args.node_repository, target_ref)
+    target_node_version = target_version(target_ref, target_sha)
 
     check_unmapped_files(target_sha)
 
@@ -196,7 +245,7 @@ def sync(args: argparse.Namespace) -> int:
             )
 
     conflicts: list[str] = []
-    would_change = current_state != target_sha
+    would_change_mapped_files = False
     with tempfile.TemporaryDirectory(prefix='sync-node-ncrypto-') as temporary_directory_name:
         temporary_directory = Path(temporary_directory_name)
         for source, destination in MAPPINGS.items():
@@ -208,30 +257,35 @@ def sync(args: argparse.Namespace) -> int:
                 temporary_directory=temporary_directory,
             )
             if destination.read_bytes() != merged:
-                would_change = True
+                would_change_mapped_files = True
             if not args.dry_run:
                 destination.write_bytes(merged)
             if conflicted:
                 conflicts.append(str(destination))
 
-    if not args.dry_run:
+    paths = list(MAPPINGS.values())
+    changed = would_change_mapped_files if args.dry_run else has_changes(paths)
+
+    if not args.dry_run and changed:
         write_state(state_path, target_sha)
 
-    paths = [*MAPPINGS.values(), state_path]
-    changed = would_change if args.dry_run else has_changes(paths)
     outputs = {
         'base_sha': base_sha,
         'target_sha': target_sha,
         'target_short_sha': target_sha[:12],
+        'target_ref': target_ref,
+        'target_version': target_node_version,
         'has_changes': changed,
         'has_conflicts': bool(conflicts),
         'conflicts': conflicts,
-        'branch_name': f'sync-node-ncrypto/{target_sha[:12]}',
+        'branch_name': f'sync-node-ncrypto/{target_node_version}',
     }
     write_github_output(outputs)
 
     print(f'Base node commit:   {base_sha}')
     print(f'Target node commit: {target_sha}')
+    print(f'Target node ref:    {target_ref}')
+    print(f'Target Node.js:     {target_node_version}')
     print(f'Changed files:      {str(changed).lower()}')
     print(f'Conflicts:          {str(bool(conflicts)).lower()}')
     for path in conflicts:
@@ -243,7 +297,11 @@ def sync(args: argparse.Namespace) -> int:
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Sync nodejs/node deps/ncrypto into standalone ncrypto.')
     parser.add_argument('--node-repository', default=NODE_REPOSITORY)
-    parser.add_argument('--node-ref', default='main')
+    parser.add_argument(
+        '--node-ref',
+        default='',
+        help='nodejs/node ref to sync from; defaults to latest stable release',
+    )
     parser.add_argument('--base-node-ref', default='')
     parser.add_argument('--state-file', default=str(STATE_FILE))
     parser.add_argument('--dry-run', action='store_true')
