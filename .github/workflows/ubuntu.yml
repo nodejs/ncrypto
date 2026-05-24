@@ -52,22 +52,27 @@ jobs:
       matrix:
         include:
           - name: "1.1.1"
+            cache_key: "1.1.1"
             version: "1.1.1w"
             tag: "OpenSSL_1_1_1w"
             cxx_flags: ""
           - name: "3.0"
+            cache_key: "3.0"
             version: "3.0.20"
             tag: "openssl-3.0.20"
             cxx_flags: ""
           - name: "3.5 LTS"
+            cache_key: "3.5-lts"
             version: "3.5.6"
             tag: "openssl-3.5.6"
             cxx_flags: ""
           - name: "3.5 LTS, no Argon2"
+            cache_key: "3.5-lts-no-argon2"
             version: "3.5.6"
             tag: "openssl-3.5.6"
             cxx_flags: "-DOPENSSL_NO_ARGON2"
           - name: "4.0"
+            cache_key: "4.0"
             version: "4.0.0"
             tag: "openssl-4.0.0"
             cxx_flags: ""
@@ -91,13 +96,13 @@ jobs:
           curl -LO https://github.com/openssl/openssl/releases/download/${OPENSSL_TAG}/openssl-${OPENSSL_VERSION}.tar.gz
           tar xzf openssl-${OPENSSL_VERSION}.tar.gz
           cd openssl-${OPENSSL_VERSION}
-          ./Configure --prefix=${OPENSSL_DIR} --openssldir=${OPENSSL_DIR}/ssl
+          ./config --prefix=${OPENSSL_DIR} --openssldir=${OPENSSL_DIR}/ssl
           make -j$(nproc)
           make install_sw
       - name: ccache
         uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
         with:
-          key: ${{github.job}}-openssl-${{ matrix.name }}
+          key: ${{github.job}}-openssl-${{ matrix.cache_key }}
       - name: Setup dependencies
         run: sudo apt-get update && sudo apt-get install -y ninja-build libgtest-dev
       - name: Prepare
