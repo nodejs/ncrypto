@@ -45,11 +45,37 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build
 
-  # Test with OpenSSL 3.2+ to cover Argon2 code path
+  # Test with OpenSSL release lines
   openssl:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "1.1.1"
+            version: "1.1.1w"
+            tag: "OpenSSL_1_1_1w"
+            cxx_flags: ""
+          - name: "3.0"
+            version: "3.0.20"
+            tag: "openssl-3.0.20"
+            cxx_flags: ""
+          - name: "3.5 LTS"
+            version: "3.5.6"
+            tag: "openssl-3.5.6"
+            cxx_flags: ""
+          - name: "3.5 LTS, no Argon2"
+            version: "3.5.6"
+            tag: "openssl-3.5.6"
+            cxx_flags: "-DOPENSSL_NO_ARGON2"
+          - name: "4.0"
+            version: "4.0.0"
+            tag: "openssl-4.0.0"
+            cxx_flags: ""
+    name: OpenSSL ${{ matrix.name }}
     runs-on: ubuntu-latest
     env:
-      OPENSSL_VERSION: "3.4.1"
+      OPENSSL_VERSION: ${{ matrix.version }}
+      OPENSSL_TAG: ${{ matrix.tag }}
       OPENSSL_DIR: "${{ github.workspace }}/openssl-install"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -62,7 +88,7 @@ jobs:
       - name: Build OpenSSL
         if: steps.cache-openssl.outputs.cache-hit != 'true'
         run: |
-          curl -LO https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz
+          curl -LO https://github.com/openssl/openssl/releases/download/${OPENSSL_TAG}/openssl-${OPENSSL_VERSION}.tar.gz
           tar xzf openssl-${OPENSSL_VERSION}.tar.gz
           cd openssl-${OPENSSL_VERSION}
           ./Configure --prefix=${OPENSSL_DIR} --openssldir=${OPENSSL_DIR}/ssl
@@ -71,53 +97,12 @@ jobs:
       - name: ccache
         uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
         with:
-          key: ${{github.job}}-openssl
+          key: ${{github.job}}-openssl-${{ matrix.name }}
       - name: Setup dependencies
         run: sudo apt-get update && sudo apt-get install -y ninja-build libgtest-dev
       - name: Prepare
         run: |
-          cmake -DNCRYPTO_SHARED_LIBS=ON -G Ninja -B build \
-            -DOPENSSL_ROOT_DIR=${OPENSSL_DIR} \
-            -DCMAKE_PREFIX_PATH=${OPENSSL_DIR}
-      - name: Build
-        run: cmake --build build -j=4
-      - name: Test
-        run: ctest --output-on-failure --test-dir build
-        env:
-          LD_LIBRARY_PATH: ${{ env.OPENSSL_DIR }}/lib64:${{ env.OPENSSL_DIR }}/lib
-
-  # Test with OPENSSL_NO_ARGON2 defined (Argon2 tests excluded)
-  openssl-no-argon2:
-    runs-on: ubuntu-latest
-    env:
-      OPENSSL_VERSION: "3.4.1"
-      OPENSSL_DIR: "${{ github.workspace }}/openssl-install"
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Cache OpenSSL
-        id: cache-openssl
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ env.OPENSSL_DIR }}
-          key: openssl-${{ env.OPENSSL_VERSION }}-${{ runner.os }}
-      - name: Build OpenSSL
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          curl -LO https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz
-          tar xzf openssl-${OPENSSL_VERSION}.tar.gz
-          cd openssl-${OPENSSL_VERSION}
-          ./Configure --prefix=${OPENSSL_DIR} --openssldir=${OPENSSL_DIR}/ssl
-          make -j$(nproc)
-          make install_sw
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
-        with:
-          key: ${{github.job}}-openssl-no-argon2
-      - name: Setup dependencies
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libgtest-dev
-      - name: Prepare
-        run: |
-          cmake -DNCRYPTO_SHARED_LIBS=ON -DCMAKE_CXX_FLAGS="-DOPENSSL_NO_ARGON2" -G Ninja -B build \
+          cmake -DNCRYPTO_SHARED_LIBS=ON -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}" -G Ninja -B build \
             -DOPENSSL_ROOT_DIR=${OPENSSL_DIR} \
             -DCMAKE_PREFIX_PATH=${OPENSSL_DIR}
       - name: Build

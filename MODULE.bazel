@@ -1,7 +1,7 @@
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
-bazel_dep(name = "boringssl", version = "0.20251002.0", repo_name = "ssl")
-bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "boringssl", version = "0.20260508.0", repo_name = "ssl")
+bazel_dep(name = "rules_cc", version = "0.2.17")
 
 archive_override(
     module_name = "boringssl",
@@ -9,8 +9,8 @@ archive_override(
     patches = [
         "//:patches/0001-Expose-libdecrepit-so-NodeJS-can-use-it-for-ncrypto.patch",
     ],
-    sha256 = "f96733fc3df03d4195db656d1b7b8c174c33f95d052f811f0ecc8f4e4e3db332",
-    strip_prefix = "boringssl-0.20251002.0",
+    sha256 = "de3371d3fe085afd34778a4c988fb7840b9c92cb21504e674f33ebefd98edc00",
+    strip_prefix = "boringssl-0.20260508.0",
     type = "tgz",
-    urls = ["https://github.com/google/boringssl/archive/refs/tags/0.20251002.0.tar.gz"],
+    urls = ["https://github.com/google/boringssl/archive/refs/tags/0.20260508.0.tar.gz"],
 )

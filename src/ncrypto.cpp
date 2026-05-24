@@ -7,7 +7,6 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
 
 #ifndef NCRYPTO_NO_KDF_H
 #include <openssl/kdf.h>
@@ -16,14 +15,11 @@
 #include <openssl/hkdf.h>
 #endif
 
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@e7da6f056ac4
-=======
 #if NCRYPTO_USE_BORINGSSL_EVP_DO_ALL_FALLBACK
 #include <openssl/bytestring.h>
 #include <openssl/cipher.h>
 #include <openssl/pem.h>
 #endif
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@cfd7920d5a2d
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -37,7 +33,7 @@
 #include <openssl/thread.h>
 #endif
 #endif
-#if OPENSSL_WITH_PQC
+#if OPENSSL_WITH_OPENSSL_PQC
 struct PQCMapping {
   const char* name;
   int nid;
