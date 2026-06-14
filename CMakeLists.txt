@@ -18,9 +18,9 @@ else()
 
   CPMAddPackage(
     NAME boringssl
-    VERSION 0.20250818.0
+    VERSION 0.20260508.0
     GITHUB_REPOSITORY google/boringssl
-    GIT_TAG 0.20250818.0
+    GIT_TAG 0.20260508.0
     OPTIONS "BUILD_SHARED_LIBS OFF" "BUILD_TESTING OFF"
   )
 endif()
