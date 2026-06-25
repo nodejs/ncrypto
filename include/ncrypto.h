@@ -75,9 +75,9 @@
 #endif
 
 #if OPENSSL_VERSION_PREREQ(3, 0)
-#define OPENSSL_WITH_KMAC 1
+#define OPENSSL_WITH_EVP_MAC 1
 #else
-#define OPENSSL_WITH_KMAC 0
+#define OPENSSL_WITH_EVP_MAC 0
 #endif
 
 #if defined(OPENSSL_IS_BORINGSSL) || OPENSSL_VERSION_PREREQ(3, 2)
@@ -831,6 +831,155 @@ class BIOPointer final {
   mutable DeleteFnPtr<BIO, BIO_free_all> bio_;
 };
 
+<<<<<<< nodejs/ncrypto:include/ncrypto.h
+||||||| nodejs/node:deps/ncrypto/ncrypto.h@cfd7920d5a2d
+class BignumPointer final {
+ public:
+  BignumPointer() = default;
+  explicit BignumPointer(BIGNUM* bignum);
+  explicit BignumPointer(const unsigned char* data, size_t len);
+  BignumPointer(BignumPointer&& other) noexcept;
+  BignumPointer& operator=(BignumPointer&& other) noexcept;
+  NCRYPTO_DISALLOW_COPY(BignumPointer)
+  ~BignumPointer();
+
+  int operator<=>(const BignumPointer& other) const noexcept;
+  int operator<=>(const BIGNUM* other) const noexcept;
+  inline operator bool() const { return bn_ != nullptr; }
+  inline BIGNUM* get() const noexcept { return bn_.get(); }
+  void reset(BIGNUM* bn = nullptr);
+  void reset(const unsigned char* data, size_t len);
+  BIGNUM* release();
+
+  bool isZero() const;
+  bool isOne() const;
+
+  bool setWord(unsigned long w);  // NOLINT(runtime/int)
+  unsigned long getWord() const;  // NOLINT(runtime/int)
+
+  size_t byteLength() const;
+
+  DataPointer toHex() const;
+  DataPointer encode() const;
+  DataPointer encodePadded(size_t size) const;
+  size_t encodeInto(unsigned char* out) const;
+  size_t encodePaddedInto(unsigned char* out, size_t size) const;
+
+  using PrimeCheckCallback = std::function<bool(int, int)>;
+  int isPrime(int checks,
+              PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
+  struct PrimeConfig {
+    int bits;
+    bool safe = false;
+    const BignumPointer& add;
+    const BignumPointer& rem;
+  };
+
+  static BignumPointer NewPrime(
+      const PrimeConfig& params,
+      PrimeCheckCallback cb = defaultPrimeCheckCallback);
+
+  bool generate(const PrimeConfig& params,
+                PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
+
+  static BignumPointer New();
+  static BignumPointer NewSecure();
+  static BignumPointer NewSub(const BignumPointer& a, const BignumPointer& b);
+  static BignumPointer NewLShift(size_t length);
+
+  static DataPointer Encode(const BIGNUM* bn);
+  static DataPointer EncodePadded(const BIGNUM* bn, size_t size);
+  static size_t EncodePaddedInto(const BIGNUM* bn,
+                                 unsigned char* out,
+                                 size_t size);
+  static int GetBitCount(const BIGNUM* bn);
+  static int GetByteCount(const BIGNUM* bn);
+  static unsigned long GetWord(const BIGNUM* bn);  // NOLINT(runtime/int)
+  static const BIGNUM* One();
+
+  BignumPointer clone();
+
+ private:
+  DeleteFnPtr<BIGNUM, BN_clear_free> bn_;
+
+  static bool defaultPrimeCheckCallback(int, int) { return 1; }
+};
+
+=======
+class BignumPointer final {
+ public:
+  BignumPointer() = default;
+  explicit BignumPointer(BIGNUM* bignum);
+  explicit BignumPointer(const unsigned char* data, size_t len);
+  BignumPointer(BignumPointer&& other) noexcept;
+  BignumPointer& operator=(BignumPointer&& other) noexcept;
+  NCRYPTO_DISALLOW_COPY(BignumPointer)
+  ~BignumPointer();
+
+  int operator<=>(const BignumPointer& other) const noexcept;
+  int operator<=>(const BIGNUM* other) const noexcept;
+  inline operator bool() const { return bn_ != nullptr; }
+  inline BIGNUM* get() const noexcept { return bn_.get(); }
+  void reset(BIGNUM* bn = nullptr);
+  void reset(const unsigned char* data, size_t len);
+  BIGNUM* release();
+
+  bool isZero() const;
+  bool isOne() const;
+
+  bool setWord(unsigned long w);  // NOLINT(runtime/int)
+  std::optional<unsigned long> getWord() const;  // NOLINT(runtime/int)
+
+  size_t byteLength() const;
+
+  DataPointer toHex() const;
+  DataPointer encode() const;
+  DataPointer encodePadded(size_t size) const;
+  size_t encodeInto(unsigned char* out) const;
+  size_t encodePaddedInto(unsigned char* out, size_t size) const;
+
+  using PrimeCheckCallback = std::function<bool(int, int)>;
+  int isPrime(int checks,
+              PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
+  struct PrimeConfig {
+    int bits;
+    bool safe = false;
+    const BignumPointer& add;
+    const BignumPointer& rem;
+  };
+
+  static BignumPointer NewPrime(
+      const PrimeConfig& params,
+      PrimeCheckCallback cb = defaultPrimeCheckCallback);
+
+  bool generate(const PrimeConfig& params,
+                PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
+
+  static BignumPointer New();
+  static BignumPointer NewSecure();
+  static BignumPointer NewSub(const BignumPointer& a, const BignumPointer& b);
+  static BignumPointer NewLShift(size_t length);
+
+  static DataPointer Encode(const BIGNUM* bn);
+  static DataPointer EncodePadded(const BIGNUM* bn, size_t size);
+  static size_t EncodePaddedInto(const BIGNUM* bn,
+                                 unsigned char* out,
+                                 size_t size);
+  static int GetBitCount(const BIGNUM* bn);
+  static int GetByteCount(const BIGNUM* bn);
+  static std::optional<unsigned long> GetWord(  // NOLINT(runtime/int)
+      const BIGNUM* bn);
+  static const BIGNUM* One();
+
+  BignumPointer clone();
+
+ private:
+  DeleteFnPtr<BIGNUM, BN_clear_free> bn_;
+
+  static bool defaultPrimeCheckCallback(int, int) { return 1; }
+};
+
+>>>>>>> nodejs/node:deps/ncrypto/ncrypto.h@2022edf3e32c
 class CipherCtxPointer final {
  public:
   static CipherCtxPointer New();
@@ -1569,6 +1718,7 @@ class EVPMDCtxPointer final {
   DeleteFnPtr<EVP_MD_CTX, EVP_MD_CTX_free> ctx_;
 };
 
+#if !OPENSSL_WITH_EVP_MAC
 class HMACCtxPointer final {
  public:
   HMACCtxPointer();
@@ -1595,8 +1745,9 @@ class HMACCtxPointer final {
  private:
   DeleteFnPtr<HMAC_CTX, HMAC_CTX_free> ctx_;
 };
+#endif  // !OPENSSL_WITH_EVP_MAC
 
-#if OPENSSL_WITH_KMAC
+#if OPENSSL_WITH_EVP_MAC
 class EVPMacPointer final {
  public:
   EVPMacPointer() = default;
@@ -1644,7 +1795,34 @@ class EVPMacCtxPointer final {
  private:
   DeleteFnPtr<EVP_MAC_CTX, EVP_MAC_CTX_free> ctx_;
 };
-#endif  // OPENSSL_WITH_KMAC
+
+class HMACCtxPointer final {
+ public:
+  HMACCtxPointer();
+  HMACCtxPointer(HMACCtxPointer&& other) noexcept;
+  HMACCtxPointer& operator=(HMACCtxPointer&& other) noexcept;
+  NCRYPTO_DISALLOW_COPY(HMACCtxPointer)
+  ~HMACCtxPointer();
+
+  inline bool operator==(std::nullptr_t) noexcept { return ctx_ == nullptr; }
+  inline operator bool() const { return ctx_ != nullptr; }
+  void reset();
+
+  bool init(const Buffer<const void>& buf, const Digest& md);
+  bool update(const Buffer<const void>& buf);
+  DataPointer digest();
+  bool digestInto(Buffer<void>* buf);
+
+  static HMACCtxPointer New();
+
+ private:
+  HMACCtxPointer(EVPMacPointer&& mac, EVPMacCtxPointer&& ctx);
+
+  EVPMacPointer mac_;
+  EVPMacCtxPointer ctx_;
+  size_t md_size_ = 0;
+};
+#endif  // OPENSSL_WITH_EVP_MAC
 
 #ifndef OPENSSL_NO_ENGINE
 class EnginePointer final {
