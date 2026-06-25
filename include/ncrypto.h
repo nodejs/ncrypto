@@ -75,9 +75,9 @@
 #endif
 
 #if OPENSSL_VERSION_PREREQ(3, 0)
-#define OPENSSL_WITH_KMAC 1
+#define OPENSSL_WITH_EVP_MAC 1
 #else
-#define OPENSSL_WITH_KMAC 0
+#define OPENSSL_WITH_EVP_MAC 0
 #endif
 
 #if defined(OPENSSL_IS_BORINGSSL) || OPENSSL_VERSION_PREREQ(3, 2)
@@ -616,8 +616,8 @@ class BignumPointer final {
   bool isZero() const;
   bool isOne() const;
 
-  bool setWord(unsigned long w);  // NOLINT(runtime/int)
-  unsigned long getWord() const;  // NOLINT(runtime/int)
+  bool setWord(unsigned long w);                 // NOLINT(runtime/int)
+  std::optional<unsigned long> getWord() const;  // NOLINT(runtime/int)
 
   size_t byteLength() const;
   size_t bitLength() const;
@@ -657,7 +657,8 @@ class BignumPointer final {
                                  size_t size);
   static int GetBitCount(const BIGNUM* bn);
   static int GetByteCount(const BIGNUM* bn);
-  static unsigned long GetWord(const BIGNUM* bn);  // NOLINT(runtime/int)
+  static std::optional<unsigned long> GetWord(  // NOLINT(runtime/int)
+      const BIGNUM* bn);
   static const BIGNUM* One();
 
   BignumPointer clone();
@@ -1569,6 +1570,7 @@ class EVPMDCtxPointer final {
   DeleteFnPtr<EVP_MD_CTX, EVP_MD_CTX_free> ctx_;
 };
 
+#if !OPENSSL_WITH_EVP_MAC
 class HMACCtxPointer final {
  public:
   HMACCtxPointer();
@@ -1595,8 +1597,9 @@ class HMACCtxPointer final {
  private:
   DeleteFnPtr<HMAC_CTX, HMAC_CTX_free> ctx_;
 };
+#endif  // !OPENSSL_WITH_EVP_MAC
 
-#if OPENSSL_WITH_KMAC
+#if OPENSSL_WITH_EVP_MAC
 class EVPMacPointer final {
  public:
   EVPMacPointer() = default;
@@ -1644,7 +1647,34 @@ class EVPMacCtxPointer final {
  private:
   DeleteFnPtr<EVP_MAC_CTX, EVP_MAC_CTX_free> ctx_;
 };
-#endif  // OPENSSL_WITH_KMAC
+
+class HMACCtxPointer final {
+ public:
+  HMACCtxPointer();
+  HMACCtxPointer(HMACCtxPointer&& other) noexcept;
+  HMACCtxPointer& operator=(HMACCtxPointer&& other) noexcept;
+  NCRYPTO_DISALLOW_COPY(HMACCtxPointer)
+  ~HMACCtxPointer();
+
+  inline bool operator==(std::nullptr_t) noexcept { return ctx_ == nullptr; }
+  inline operator bool() const { return ctx_ != nullptr; }
+  void reset();
+
+  bool init(const Buffer<const void>& buf, const Digest& md);
+  bool update(const Buffer<const void>& buf);
+  DataPointer digest();
+  bool digestInto(Buffer<void>* buf);
+
+  static HMACCtxPointer New();
+
+ private:
+  HMACCtxPointer(EVPMacPointer&& mac, EVPMacCtxPointer&& ctx);
+
+  EVPMacPointer mac_;
+  EVPMacCtxPointer ctx_;
+  size_t md_size_ = 0;
+};
+#endif  // OPENSSL_WITH_EVP_MAC
 
 #ifndef OPENSSL_NO_ENGINE
 class EnginePointer final {
