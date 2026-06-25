@@ -617,7 +617,7 @@ class BignumPointer final {
   bool isOne() const;
 
   bool setWord(unsigned long w);  // NOLINT(runtime/int)
-  unsigned long getWord() const;  // NOLINT(runtime/int)
+  std::optional<unsigned long> getWord() const;  // NOLINT(runtime/int)
 
   size_t byteLength() const;
   size_t bitLength() const;
@@ -657,7 +657,8 @@ class BignumPointer final {
                                  size_t size);
   static int GetBitCount(const BIGNUM* bn);
   static int GetByteCount(const BIGNUM* bn);
-  static unsigned long GetWord(const BIGNUM* bn);  // NOLINT(runtime/int)
+  static std::optional<unsigned long> GetWord(  // NOLINT(runtime/int)
+      const BIGNUM* bn);
   static const BIGNUM* One();
 
   BignumPointer clone();
@@ -831,155 +832,6 @@ class BIOPointer final {
   mutable DeleteFnPtr<BIO, BIO_free_all> bio_;
 };
 
-<<<<<<< nodejs/ncrypto:include/ncrypto.h
-||||||| nodejs/node:deps/ncrypto/ncrypto.h@cfd7920d5a2d
-class BignumPointer final {
- public:
-  BignumPointer() = default;
-  explicit BignumPointer(BIGNUM* bignum);
-  explicit BignumPointer(const unsigned char* data, size_t len);
-  BignumPointer(BignumPointer&& other) noexcept;
-  BignumPointer& operator=(BignumPointer&& other) noexcept;
-  NCRYPTO_DISALLOW_COPY(BignumPointer)
-  ~BignumPointer();
-
-  int operator<=>(const BignumPointer& other) const noexcept;
-  int operator<=>(const BIGNUM* other) const noexcept;
-  inline operator bool() const { return bn_ != nullptr; }
-  inline BIGNUM* get() const noexcept { return bn_.get(); }
-  void reset(BIGNUM* bn = nullptr);
-  void reset(const unsigned char* data, size_t len);
-  BIGNUM* release();
-
-  bool isZero() const;
-  bool isOne() const;
-
-  bool setWord(unsigned long w);  // NOLINT(runtime/int)
-  unsigned long getWord() const;  // NOLINT(runtime/int)
-
-  size_t byteLength() const;
-
-  DataPointer toHex() const;
-  DataPointer encode() const;
-  DataPointer encodePadded(size_t size) const;
-  size_t encodeInto(unsigned char* out) const;
-  size_t encodePaddedInto(unsigned char* out, size_t size) const;
-
-  using PrimeCheckCallback = std::function<bool(int, int)>;
-  int isPrime(int checks,
-              PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
-  struct PrimeConfig {
-    int bits;
-    bool safe = false;
-    const BignumPointer& add;
-    const BignumPointer& rem;
-  };
-
-  static BignumPointer NewPrime(
-      const PrimeConfig& params,
-      PrimeCheckCallback cb = defaultPrimeCheckCallback);
-
-  bool generate(const PrimeConfig& params,
-                PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
-
-  static BignumPointer New();
-  static BignumPointer NewSecure();
-  static BignumPointer NewSub(const BignumPointer& a, const BignumPointer& b);
-  static BignumPointer NewLShift(size_t length);
-
-  static DataPointer Encode(const BIGNUM* bn);
-  static DataPointer EncodePadded(const BIGNUM* bn, size_t size);
-  static size_t EncodePaddedInto(const BIGNUM* bn,
-                                 unsigned char* out,
-                                 size_t size);
-  static int GetBitCount(const BIGNUM* bn);
-  static int GetByteCount(const BIGNUM* bn);
-  static unsigned long GetWord(const BIGNUM* bn);  // NOLINT(runtime/int)
-  static const BIGNUM* One();
-
-  BignumPointer clone();
-
- private:
-  DeleteFnPtr<BIGNUM, BN_clear_free> bn_;
-
-  static bool defaultPrimeCheckCallback(int, int) { return 1; }
-};
-
-=======
-class BignumPointer final {
- public:
-  BignumPointer() = default;
-  explicit BignumPointer(BIGNUM* bignum);
-  explicit BignumPointer(const unsigned char* data, size_t len);
-  BignumPointer(BignumPointer&& other) noexcept;
-  BignumPointer& operator=(BignumPointer&& other) noexcept;
-  NCRYPTO_DISALLOW_COPY(BignumPointer)
-  ~BignumPointer();
-
-  int operator<=>(const BignumPointer& other) const noexcept;
-  int operator<=>(const BIGNUM* other) const noexcept;
-  inline operator bool() const { return bn_ != nullptr; }
-  inline BIGNUM* get() const noexcept { return bn_.get(); }
-  void reset(BIGNUM* bn = nullptr);
-  void reset(const unsigned char* data, size_t len);
-  BIGNUM* release();
-
-  bool isZero() const;
-  bool isOne() const;
-
-  bool setWord(unsigned long w);  // NOLINT(runtime/int)
-  std::optional<unsigned long> getWord() const;  // NOLINT(runtime/int)
-
-  size_t byteLength() const;
-
-  DataPointer toHex() const;
-  DataPointer encode() const;
-  DataPointer encodePadded(size_t size) const;
-  size_t encodeInto(unsigned char* out) const;
-  size_t encodePaddedInto(unsigned char* out, size_t size) const;
-
-  using PrimeCheckCallback = std::function<bool(int, int)>;
-  int isPrime(int checks,
-              PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
-  struct PrimeConfig {
-    int bits;
-    bool safe = false;
-    const BignumPointer& add;
-    const BignumPointer& rem;
-  };
-
-  static BignumPointer NewPrime(
-      const PrimeConfig& params,
-      PrimeCheckCallback cb = defaultPrimeCheckCallback);
-
-  bool generate(const PrimeConfig& params,
-                PrimeCheckCallback cb = defaultPrimeCheckCallback) const;
-
-  static BignumPointer New();
-  static BignumPointer NewSecure();
-  static BignumPointer NewSub(const BignumPointer& a, const BignumPointer& b);
-  static BignumPointer NewLShift(size_t length);
-
-  static DataPointer Encode(const BIGNUM* bn);
-  static DataPointer EncodePadded(const BIGNUM* bn, size_t size);
-  static size_t EncodePaddedInto(const BIGNUM* bn,
-                                 unsigned char* out,
-                                 size_t size);
-  static int GetBitCount(const BIGNUM* bn);
-  static int GetByteCount(const BIGNUM* bn);
-  static std::optional<unsigned long> GetWord(  // NOLINT(runtime/int)
-      const BIGNUM* bn);
-  static const BIGNUM* One();
-
-  BignumPointer clone();
-
- private:
-  DeleteFnPtr<BIGNUM, BN_clear_free> bn_;
-
-  static bool defaultPrimeCheckCallback(int, int) { return 1; }
-};
-
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.h@2022edf3e32c
 class CipherCtxPointer final {
  public:
   static CipherCtxPointer New();
