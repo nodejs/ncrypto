@@ -616,7 +616,7 @@ class BignumPointer final {
   bool isZero() const;
   bool isOne() const;
 
-  bool setWord(unsigned long w);  // NOLINT(runtime/int)
+  bool setWord(unsigned long w);                 // NOLINT(runtime/int)
   std::optional<unsigned long> getWord() const;  // NOLINT(runtime/int)
 
   size_t byteLength() const;
