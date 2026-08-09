@@ -22,6 +22,7 @@
 #endif
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <cstring>
 #include <string_view>
 #include <vector>
