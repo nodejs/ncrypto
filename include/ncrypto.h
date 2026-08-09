@@ -24,19 +24,13 @@
 #include <optional>
 #include <string>
 #include <string_view>
-<<<<<<< nodejs/ncrypto:include/ncrypto.h
 
 #if NCRYPTO_DEVELOPMENT_CHECKS
 #include <iostream>
 #endif
 
-#ifndef OPENSSL_NO_ENGINE
-||||||| nodejs/node:deps/ncrypto/ncrypto.h@bebd1b8d92bf
-#ifndef OPENSSL_NO_ENGINE
-=======
 #if defined(NCRYPTO_ENGINE_COMPAT) && NCRYPTO_ENGINE_COMPAT &&                 \
     !defined(OPENSSL_NO_ENGINE)
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.h@b4f23d3619c9
 #include <openssl/engine.h>
 #endif  // NCRYPTO_ENGINE_COMPAT && !OPENSSL_NO_ENGINE
 
@@ -775,7 +769,6 @@ class Ec final {
   int getCurve() const;
   uint32_t getDegree() const;
   std::string getCurveName() const;
-  const EC_POINT* getPublicKey() const;
   const BIGNUM* getPrivateKey() const;
 
   inline operator bool() const { return ec_ != nullptr; }
@@ -799,15 +792,11 @@ class Ec final {
   point_conversion_form_t form_ = POINT_CONVERSION_UNCOMPRESSED;
 #else
   OSSL3_CONST EC_KEY* ec_ = nullptr;
-<<<<<<< nodejs/ncrypto:include/ncrypto.h
-  // Affine coordinates for the EC_KEY.
+#endif
+  // Affine coordinates and private scalar for the EC key.
   BignumPointer x_;
   BignumPointer y_;
   BignumPointer d_;
-||||||| nodejs/node:deps/ncrypto/ncrypto.h@bebd1b8d92bf
-=======
-#endif
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.h@b4f23d3619c9
 };
 
 // A managed pointer to a buffer of data. When destroyed the underlying

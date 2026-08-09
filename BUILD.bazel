@@ -26,6 +26,7 @@ cc_library(
     ],
     includes = ["include"],
     local_defines = {
+        "NCRYPTO_ENGINE_COMPAT": 1,
         "NCRYPTO_BSSL_LIBDECREPIT_MISSING": select(
             {
                 ":cfg_bssl_libdecrepit_missing": 1,

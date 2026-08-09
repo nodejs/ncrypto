@@ -126,20 +126,21 @@ TEST(BignumPointer, byteLength) {
 // Ec class tests
 
 // Helper to create an EC key for testing
-static ECKeyPointer createTestEcKey() {
+static EVPKeyPointer createTestEcKey() {
   // NID_X9_62_prime256v1 is P-256
-  auto key = ECKeyPointer::NewByCurveName(NID_X9_62_prime256v1);
-  if (key && EC_KEY_generate_key(key.get())) {
-    return key;
-  }
-  return {};
+  auto ecKey = ECKeyPointer::NewByCurveName(NID_X9_62_prime256v1);
+  if (!ecKey || !ecKey.generate()) return {};
+
+  auto key = EVPKeyPointer::New();
+  if (!key || !key.set(ecKey)) return {};
+  return key;
 }
 
 TEST(Ec, getDegree) {
   auto ecKey = createTestEcKey();
   ASSERT_TRUE(ecKey);
 
-  Ec ec(ecKey.get());
+  Ec ec = ecKey;
   ASSERT_TRUE(ec);
 
   // P-256 has degree 256
@@ -150,7 +151,7 @@ TEST(Ec, getCurveName) {
   auto ecKey = createTestEcKey();
   ASSERT_TRUE(ecKey);
 
-  Ec ec(ecKey.get());
+  Ec ec = ecKey;
   ASSERT_TRUE(ec);
 
   // P-256 is also known as prime256v1
@@ -162,7 +163,7 @@ TEST(Ec, getPublicKey) {
   auto ecKey = createTestEcKey();
   ASSERT_TRUE(ecKey);
 
-  Ec ec(ecKey.get());
+  Ec ec = ecKey;
   ASSERT_TRUE(ec);
 
   // Public key should exist
@@ -174,7 +175,7 @@ TEST(Ec, getPrivateKey) {
   auto ecKey = createTestEcKey();
   ASSERT_TRUE(ecKey);
 
-  Ec ec(ecKey.get());
+  Ec ec = ecKey;
   ASSERT_TRUE(ec);
 
   // Private key should exist for a generated key
@@ -186,7 +187,7 @@ TEST(Ec, getXYCoordinates) {
   auto ecKey = createTestEcKey();
   ASSERT_TRUE(ecKey);
 
-  Ec ec(ecKey.get());
+  Ec ec = ecKey;
   ASSERT_TRUE(ec);
 
   // X and Y coordinates should be populated
@@ -207,7 +208,7 @@ TEST(Ec, getCurve) {
   auto ecKey = createTestEcKey();
   ASSERT_TRUE(ecKey);
 
-  Ec ec(ecKey.get());
+  Ec ec = ecKey;
   ASSERT_TRUE(ec);
 
   // getCurve should return the NID for P-256
@@ -255,13 +256,8 @@ TEST(Ec, GetCurves_early_exit) {
 // EVPKeyPointer tests
 
 TEST(EVPKeyPointer, operatorEc) {
-  auto ecKey = createTestEcKey();
-  ASSERT_TRUE(ecKey);
-
-  // Create EVPKeyPointer from EC_KEY
-  EVPKeyPointer key(EVP_PKEY_new());
+  auto key = createTestEcKey();
   ASSERT_TRUE(key);
-  ASSERT_TRUE(EVP_PKEY_set1_EC_KEY(key.get(), ecKey.get()));
 
   // Convert to Ec
   Ec ec = key;
@@ -270,13 +266,8 @@ TEST(EVPKeyPointer, operatorEc) {
 }
 
 TEST(EVPKeyPointer, clone) {
-  auto ecKey = createTestEcKey();
-  ASSERT_TRUE(ecKey);
-
-  // Create EVPKeyPointer from EC_KEY
-  EVPKeyPointer key(EVP_PKEY_new());
+  auto key = createTestEcKey();
   ASSERT_TRUE(key);
-  ASSERT_TRUE(EVP_PKEY_set1_EC_KEY(key.get(), ecKey.get()));
 
   // Clone the key
   auto cloned = key.clone();

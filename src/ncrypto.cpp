@@ -531,22 +531,14 @@ DataPointer DataPointer::resize(size_t len) {
   if (actual_len == len_) return std::move(*this);
 
   auto buf = release();
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
-  if (actual_len == len_) return DataPointer(buf.data, actual_len);
+  if (actual_len == 0) return DataPointer(buf.data, actual_len);
+
   auto new_data = OPENSSL_realloc(buf.data, actual_len);
   if (new_data == nullptr) {
-    free();
+    reset(buf);
     return {};
   }
   buf.data = new_data;
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@bebd1b8d92bf
-  if (actual_len == len_) return DataPointer(buf.data, actual_len);
-  buf.data = OPENSSL_realloc(buf.data, actual_len);
-=======
-  if (actual_len == 0) return DataPointer(buf.data, actual_len);
-
-  buf.data = OPENSSL_realloc(buf.data, actual_len);
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@b4f23d3619c9
   buf.len = actual_len;
   return DataPointer(buf);
 }
@@ -1898,26 +1890,7 @@ int BIOPointer::Write(BIOPointer* bio, std::string_view message) {
 // ============================================================================
 // DHPointer
 
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@bebd1b8d92bf
 namespace {
-bool EqualNoCase(const std::string_view a, const std::string_view b) {
-  if (a.size() != b.size()) return false;
-  return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](char a, char b) {
-    return std::tolower(a) == std::tolower(b);
-  });
-}
-}  // namespace
-
-=======
-namespace {
-bool EqualNoCase(const std::string_view a, const std::string_view b) {
-  if (a.size() != b.size()) return false;
-  return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](char a, char b) {
-    return std::tolower(a) == std::tolower(b);
-  });
-}
-
 #if NCRYPTO_USE_OPENSSL3_PROVIDER
 const char* GetOpenSSLDhGroupName(const std::string_view name,
                                   DHPointer::FindGroupOption option) {
@@ -2092,7 +2065,6 @@ DHPointer::DHPointer(BignumPointer&& p,
                      const char* group_name)
     : p_(std::move(p)), g_(std::move(g)), group_name_(group_name) {}
 #else
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@b4f23d3619c9
 DHPointer::DHPointer(DH* dh) : dh_(dh) {}
 #endif
 
@@ -2750,30 +2722,12 @@ bool checkHkdfLength(const Digest& md, size_t length) {
   return true;
 }
 
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
 bool hkdfInfo(const Digest& md,
               const Buffer<const unsigned char>& key,
               const Buffer<const unsigned char>& info,
               const Buffer<const unsigned char>& salt,
               size_t length,
               Buffer<unsigned char>* out) {
-  ClearErrorOnReturn clearErrorOnReturn;
-
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@bebd1b8d92bf
-DataPointer hkdf(const Digest& md,
-                 const Buffer<const unsigned char>& key,
-                 const Buffer<const unsigned char>& info,
-                 const Buffer<const unsigned char>& salt,
-                 size_t length) {
-  ClearErrorOnReturn clearErrorOnReturn;
-
-=======
-DataPointer hkdf(const Digest& md,
-                 const Buffer<const unsigned char>& key,
-                 const Buffer<const unsigned char>& info,
-                 const Buffer<const unsigned char>& salt,
-                 size_t length) {
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@b4f23d3619c9
   if (!checkHkdfLength(md, length) || info.len > INT_MAX ||
       salt.len > INT_MAX) {
     return false;
@@ -2869,8 +2823,6 @@ bool scryptInto(const Buffer<const char>& pass,
                 uint64_t maxmem,
                 size_t length,
                 Buffer<unsigned char>* out) {
-  ClearErrorOnReturn clearErrorOnReturn;
-
   if (pass.len > INT_MAX || salt.len > INT_MAX || out == nullptr) {
     return false;
   }
@@ -2921,8 +2873,6 @@ bool pbkdf2Into(const Digest& md,
                 uint32_t iterations,
                 size_t length,
                 Buffer<unsigned char>* out) {
-  ClearErrorOnReturn clearErrorOnReturn;
-
   if (pass.len > INT_MAX || salt.len > INT_MAX || length > INT_MAX ||
       out == nullptr) {
     return false;
@@ -3219,16 +3169,12 @@ EVPKeyPointer EVPKeyPointer::NewDH(DHPointer&& dh) {
     dh.release();
   }
   return key;
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
+#endif
 #else
   // Older versions of openssl/boringssl do not implement the EVP_PKEY_*_DH
   // APIs
   return {};
 #endif
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@bebd1b8d92bf
-=======
-#endif
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@b4f23d3619c9
 }
 
 #if NCRYPTO_USE_OPENSSL3_PROVIDER
@@ -3551,6 +3497,7 @@ constexpr bool IsASN1Sequence(const unsigned char* data,
   return true;
 }
 
+#if NCRYPTO_USE_OPENSSL3_PROVIDER
 constexpr bool ReadASN1Element(const unsigned char* data,
                                size_t size,
                                unsigned char tag,
@@ -3578,6 +3525,7 @@ constexpr bool ReadASN1Element(const unsigned char* data,
   *total_size = offset + length;
   return true;
 }
+#endif
 
 constexpr bool IsEncryptedPrivateKeyInfo(
     const Buffer<const unsigned char>& buffer) {
@@ -4333,9 +4281,13 @@ EVPKeyPointer::operator Ec() const {
   int type = id();
   if (type != EVP_PKEY_EC) return {};
 
+#if NCRYPTO_USE_OPENSSL3_PROVIDER
+  return Ec(get());
+#else
   OSSL3_CONST EC_KEY* ec = EVP_PKEY_get0_EC_KEY(get());
   if (ec == nullptr) return {};
   return Ec(ec);
+#endif
 }
 
 EVPKeyPointer EVPKeyPointer::clone() const {
@@ -4346,12 +4298,6 @@ EVPKeyPointer EVPKeyPointer::clone() const {
 
 bool EVPKeyPointer::validateDsaParameters() const {
   if (!pkey_) return false;
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
-  /* Validate DSA2 parameters from FIPS 186-4 */
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@bebd1b8d92bf
-    /* Validate DSA2 parameters from FIPS 186-4 */
-=======
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@b4f23d3619c9
 #if OPENSSL_VERSION_MAJOR >= 3
   if (EVP_default_properties_is_fips_enabled(nullptr) && EVP_PKEY_DSA == id()) {
 #else
@@ -6515,7 +6461,29 @@ Ec::Ec(const EVP_PKEY* pkey) : Ec() {
       return;
   }
 
-<<<<<<< nodejs/ncrypto:src/ncrypto.cpp
+  auto point = ECPointPointer::New(ec_.get());
+  if (!point ||
+      !point.setFromBuffer({public_key_data, public_key_len}, ec_.get())) {
+    ec_.reset();
+    return;
+  }
+  pub_.reset(point.release());
+
+  x_ = BignumPointer::New();
+  y_ = BignumPointer::New();
+  if (!x_ || !y_ ||
+      EC_POINT_get_affine_coordinates(
+          ec_.get(), pub_.get(), x_.get(), y_.get(), nullptr) != 1 ||
+      !GetOptionalPKeyBnParam(pkey, OSSL_PKEY_PARAM_PRIV_KEY, &d_)) {
+    ec_.reset();
+    pub_.reset();
+    x_.reset();
+    y_.reset();
+    d_.reset();
+  }
+}
+#else
+Ec::Ec() : ec_(nullptr) {}
 Ec::Ec(OSSL3_CONST EC_KEY* key)
     : ec_(key), x_(BignumPointer::New()), y_(BignumPointer::New()) {
   if (ec_ != nullptr) {
@@ -6524,22 +6492,7 @@ Ec::Ec(OSSL3_CONST EC_KEY* key)
         getGroup(), getPublicKey(), x_.get(), y_.get(), nullptr);
   }
 }
-||||||| nodejs/node:deps/ncrypto/ncrypto.cc@bebd1b8d92bf
-Ec::Ec(OSSL3_CONST EC_KEY* key) : ec_(key) {}
-=======
-  auto point = ECPointPointer::New(ec_.get());
-  if (!point ||
-      !point.setFromBuffer({public_key_data, public_key_len}, ec_.get())) {
-    ec_.reset();
-    return;
-  }
-  pub_.reset(point.release());
-}
-#else
-Ec::Ec() : ec_(nullptr) {}
-Ec::Ec(OSSL3_CONST EC_KEY* key) : ec_(key) {}
 #endif
->>>>>>> nodejs/node:deps/ncrypto/ncrypto.cc@b4f23d3619c9
 
 const EC_GROUP* Ec::getGroup() const {
 #if NCRYPTO_USE_OPENSSL3_PROVIDER
@@ -6577,12 +6530,12 @@ std::string Ec::getCurveName() const {
   return std::string(OBJ_nid2sn(getCurve()));
 }
 
-const EC_POINT* Ec::getPublicKey() const {
-  return EC_KEY_get0_public_key(ec_);
-}
-
 const BIGNUM* Ec::getPrivateKey() const {
+#if NCRYPTO_USE_OPENSSL3_PROVIDER
+  return d_.get();
+#else
   return EC_KEY_get0_private_key(ec_);
+#endif
 }
 
 int Ec::GetCurveIdFromName(const char* name) {
