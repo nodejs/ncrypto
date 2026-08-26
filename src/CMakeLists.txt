@@ -1,4 +1,5 @@
 add_library(ncrypto ncrypto.cpp engine.cpp aead.cpp)
+target_compile_definitions(ncrypto PRIVATE NCRYPTO_ENGINE_COMPAT=1)
 
 # Enable strict warning flags for ncrypto sources only
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
